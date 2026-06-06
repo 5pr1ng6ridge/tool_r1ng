@@ -1,0 +1,10 @@
+<Application x:Class="tool_r1ng.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:tool_r1ng">
+    <Application.Resources>
+        <SolidColorBrush x:Key="LauncherTextBrush" Color="#1D2224" />
+        <SolidColorBrush x:Key="LauncherMutedBrush" Color="#667174" />
+        <SolidColorBrush x:Key="LauncherAccentBrush" Color="#197A72" />
+    </Application.Resources>
+</Application>
