@@ -7,9 +7,10 @@
         mc:Ignorable="d"
         Title="tool_r1ng"
         Width="760"
-        Height="500"
+        Height="64"
         MinWidth="520"
-        MinHeight="420"
+        MinHeight="64"
+        MaxHeight="500"
         AllowsTransparency="True"
         Background="Transparent"
         Deactivated="Window_Deactivated"
@@ -28,10 +29,10 @@
         <Style TargetType="TextBox">
             <Setter Property="Foreground" Value="{StaticResource LauncherTextBrush}" />
             <Setter Property="CaretBrush" Value="{StaticResource LauncherAccentBrush}" />
-            <Setter Property="SelectionBrush" Value="#8029B3A8" />
+            <Setter Property="SelectionBrush" Value="#805ca7ff" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontSize" Value="22" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Template">
@@ -53,12 +54,13 @@
         <Style TargetType="ListBoxItem">
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Height" Value="51" />
             <Setter Property="Margin" Value="10,3" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Row"
-                                Padding="12"
+                                Padding="10,7"
                                 Background="Transparent"
                                 BorderBrush="Transparent"
                                 BorderThickness="1"
@@ -68,11 +70,11 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Row" Property="Background" Value="#FFF7EF" />
-                                <Setter TargetName="Row" Property="BorderBrush" Value="#ECD8BE" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="#FFF7EF" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Row" Property="Background" Value="#EAF3F2" />
-                                <Setter TargetName="Row" Property="BorderBrush" Value="#8BC7BF" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="#5bcffa" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -81,10 +83,10 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="#FFFCF7"
-            BorderBrush="#272C2E"
+    <Border Background="#FFFFFF"
+            BorderBrush="#D6D0C3"
             BorderThickness="1"
-            CornerRadius="8"
+            CornerRadius="10"
             SnapsToDevicePixels="True">
         <Border.Effect>
             <DropShadowEffect BlurRadius="34"
@@ -96,16 +98,16 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="96" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="34" />
+                <RowDefinition Height="52" />
+                <RowDefinition />
+                <RowDefinition Height="12" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0"
                     Background="#FFFFFF"
                     BorderBrush="#E4DECF"
                     BorderThickness="0,0,0,1"
-                    CornerRadius="8,8,0,0">
+                    CornerRadius="10,10,0,0">
                 <Grid Margin="20,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="48" />
@@ -164,47 +166,107 @@
                                     BorderBrush="#E4DECF"
                                     BorderThickness="1"
                                     CornerRadius="8">
-                                <TextBlock Style="{StaticResource IconText}"
-                                           FontSize="17"
-                                           Foreground="{StaticResource LauncherAccentBrush}"
-                                           Text="{Binding IconGlyph}" />
+                                <Grid>
+                                    <Image Width="22"
+                                           Height="22"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           Source="{Binding IconImage}">
+                                        <Image.Style>
+                                            <Style TargetType="Image">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IconImage}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Image.Style>
+                                    </Image>
+
+                                    <TextBlock FontSize="17"
+                                               Foreground="{StaticResource LauncherAccentBrush}"
+                                               Text="{Binding IconGlyph}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource IconText}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IconImage}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
                             </Border>
 
                             <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center">
+                                        VerticalAlignment="Center"
+                                        Margin="0,-1,0,0">
                                 <TextBlock FontSize="15"
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource LauncherTextBrush}"
                                            Text="{Binding Title}"
                                            TextTrimming="CharacterEllipsis" />
-                                <TextBlock Margin="0,3,0,0"
+                                <TextBlock Margin="0,1,0,0"
                                            FontSize="12"
                                            Foreground="{StaticResource LauncherMutedBrush}"
                                            Text="{Binding Subtitle}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
 
-                            <Border Grid.Column="2"
-                                    MinWidth="58"
-                                    Height="24"
-                                    Padding="9,0"
-                                    HorizontalAlignment="Right"
-                                    VerticalAlignment="Center"
-                                    Background="#F1ECE0"
-                                    CornerRadius="8">
-                                <TextBlock HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="11"
-                                           Foreground="#586062"
-                                           Text="{Binding ProviderName}" />
-                            </Border>
+                            <StackPanel Grid.Column="2"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal">
+                                <Button Width="30"
+                                        Height="28"
+                                        Margin="0,0,8,0"
+                                        Padding="0"
+                                        Background="#F7F3EA"
+                                        BorderBrush="#E1D8CA"
+                                        BorderThickness="1"
+                                        Click="SecondaryActionButton_Click"
+                                        Cursor="Hand"
+                                        ToolTip="{Binding SecondaryActionToolTip}">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasSecondaryAction}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Style="{StaticResource IconText}"
+                                               FontSize="14"
+                                               Foreground="{StaticResource LauncherMutedBrush}"
+                                               Text="&#xE8B7;" />
+                                </Button>
+
+                                <Border MinWidth="58"
+                                        Height="24"
+                                        Padding="9,0"
+                                        VerticalAlignment="Center"
+                                        Background="#F1ECE0"
+                                        CornerRadius="8">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               Foreground="#586062"
+                                               Text="{Binding ProviderName}" />
+                                </Border>
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
             <Grid Grid.Row="2"
-                  Margin="18,0">
+                  Margin="18,0,18,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -215,14 +277,7 @@
                            Foreground="{StaticResource LauncherMutedBrush}"
                            Text="{Binding StatusText}" />
 
-                <ProgressBar Grid.Column="1"
-                             Width="76"
-                             Height="3"
-                             VerticalAlignment="Center"
-                             Background="#EAE3D5"
-                             BorderThickness="0"
-                             Foreground="{StaticResource LauncherAccentBrush}"
-                             IsIndeterminate="{Binding IsSearching}" />
+                
             </Grid>
         </Grid>
     </Border>

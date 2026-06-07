@@ -5,6 +5,6 @@
     <Application.Resources>
         <SolidColorBrush x:Key="LauncherTextBrush" Color="#1D2224" />
         <SolidColorBrush x:Key="LauncherMutedBrush" Color="#667174" />
-        <SolidColorBrush x:Key="LauncherAccentBrush" Color="#197A72" />
+        <SolidColorBrush x:Key="LauncherAccentBrush" Color="#5ca7ff" />
     </Application.Resources>
 </Application>

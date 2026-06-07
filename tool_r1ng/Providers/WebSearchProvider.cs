@@ -17,6 +17,7 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
         }
 
         var query = context.Query;
+        var preferWebSearch = EndsWithExplicitSpace(context.RawQuery);
         var results = new List<QueryResult>();
 
         if (LooksLikeUrl(query))
@@ -53,9 +54,11 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
                     IconGlyph = "\uE721",
                     ProviderId = Id,
                     ProviderName = Name,
-                    Score = query.StartsWith("?", StringComparison.Ordinal) ? 100 : 12,
+                    Score = preferWebSearch
+                        ? 140
+                        : query.StartsWith("?", StringComparison.Ordinal) ? 100 : 12,
                     ExecuteAsync = _ => ProcessLauncher.OpenAsync(
-                        $"https://www.bing.com/search?q={Uri.EscapeDataString(searchText)}")
+                        $"https://www.google.com/search?q={Uri.EscapeDataString(searchText)}")
                 });
             }
         }
@@ -69,5 +72,10 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
                && (Uri.TryCreate(query, UriKind.Absolute, out var absolute)
                    && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps)
                    || query.Contains('.') && !query.Any(char.IsWhiteSpace));
+    }
+
+    private static bool EndsWithExplicitSpace(string query)
+    {
+        return query.Length > 0 && char.IsWhiteSpace(query[^1]);
     }
 }

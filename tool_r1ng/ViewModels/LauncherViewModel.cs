@@ -33,6 +33,8 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
     public event EventHandler? RequestHide;
 
+    public event EventHandler? ResultsUpdated;
+
     public ObservableCollection<QueryResult> Results { get; } = [];
 
     public ICommand ExecuteSelectedCommand => _executeSelectedCommand;
@@ -109,28 +111,16 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
         try
         {
+            if (string.IsNullOrWhiteSpace(QueryText))
+            {
+                ReplaceResults([], cancellationToken);
+                return;
+            }
+
             IsSearching = true;
             await Task.Delay(80, cancellationToken);
             var results = await _engine.SearchAsync(QueryText, cancellationToken);
-
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                Results.Clear();
-                foreach (var result in results)
-                {
-                    Results.Add(result);
-                }
-
-                SelectedResult = Results.FirstOrDefault();
-                StatusText = Results.Count == 0 && !string.IsNullOrWhiteSpace(QueryText)
-                    ? "No results"
-                    : string.Empty;
-            });
+            ReplaceResults(results, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -142,6 +132,27 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
                 IsSearching = false;
             }
         }
+    }
+
+    private void ReplaceResults(IReadOnlyList<QueryResult> results, CancellationToken cancellationToken)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            Results.Clear();
+            foreach (var result in results)
+            {
+                Results.Add(result);
+            }
+
+            SelectedResult = Results.FirstOrDefault();
+            StatusText = string.Empty;
+            ResultsUpdated?.Invoke(this, EventArgs.Empty);
+        });
     }
 
     public void MoveSelection(int offset)
