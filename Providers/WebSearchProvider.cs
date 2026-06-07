@@ -50,6 +50,9 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
                 results.Add(new QueryResult
                 {
                     Title = searchText,
+                    HighlightedTitle = HighlightBuilder.Build(
+                        searchText,
+                        Enumerable.Range(0, searchText.Length).ToArray()),
                     Subtitle = "Search web",
                     IconGlyph = "\uE721",
                     ProviderId = Id,

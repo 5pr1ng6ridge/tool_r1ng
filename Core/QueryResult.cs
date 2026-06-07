@@ -6,6 +6,10 @@ public sealed class QueryResult
 {
     public required string Title { get; init; }
 
+    public IReadOnlyList<HighlightedTextSegment> HighlightedTitle { get; init; } = [];
+
+    public bool HasHighlightedTitle => HighlightedTitle.Count > 0;
+
     public string Subtitle { get; init; } = string.Empty;
 
     public string IconGlyph { get; init; } = "\uE721";

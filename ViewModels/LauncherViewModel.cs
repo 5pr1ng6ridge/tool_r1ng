@@ -17,6 +17,8 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private QueryResult? _selectedResult;
     private bool _isSearching;
     private string _statusText = string.Empty;
+    private string _completionSuffix = string.Empty;
+    private bool _isCompletionSuppressed;
 
     public LauncherViewModel(LauncherEngine engine)
     {
@@ -53,7 +55,26 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
             _queryText = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(CompletionPrefix));
+            UpdateCompletionSuffix();
             _ = RefreshResultsAsync();
+        }
+    }
+
+    public string CompletionPrefix => QueryText;
+
+    public string CompletionSuffix
+    {
+        get => _completionSuffix;
+        private set
+        {
+            if (_completionSuffix == value)
+            {
+                return;
+            }
+
+            _completionSuffix = value;
+            OnPropertyChanged();
         }
     }
 
@@ -69,6 +90,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
             _selectedResult = value;
             OnPropertyChanged();
+            UpdateCompletionSuffix();
             _executeSelectedCommand.RaiseCanExecuteChanged();
         }
     }
@@ -177,6 +199,30 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         SelectedResult = Results[nextIndex];
     }
 
+    public void CompleteWithSelectedResult()
+    {
+        if (SelectedResult is null)
+        {
+            return;
+        }
+
+        QueryText = string.IsNullOrEmpty(CompletionSuffix)
+            ? SelectedResult.Title
+            : QueryText + CompletionSuffix;
+        CompletionSuffix = string.Empty;
+    }
+
+    public void SetCompletionSuppressed(bool isSuppressed)
+    {
+        if (_isCompletionSuppressed == isSuppressed)
+        {
+            return;
+        }
+
+        _isCompletionSuppressed = isSuppressed;
+        UpdateCompletionSuffix();
+    }
+
     public void Reset()
     {
         QueryText = string.Empty;
@@ -205,5 +251,21 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private void UpdateCompletionSuffix()
+    {
+        if (SelectedResult is null
+            || _isCompletionSuppressed
+            || string.IsNullOrWhiteSpace(QueryText)
+            || char.IsWhiteSpace(QueryText[^1])
+            || SelectedResult.Title.Length <= QueryText.Length
+            || !SelectedResult.Title.StartsWith(QueryText, StringComparison.CurrentCultureIgnoreCase))
+        {
+            CompletionSuffix = string.Empty;
+            return;
+        }
+
+        CompletionSuffix = SelectedResult.Title[QueryText.Length..];
     }
 }

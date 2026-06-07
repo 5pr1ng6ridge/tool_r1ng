@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using tool_r1ng.Core;
 using tool_r1ng.Providers;
 using tool_r1ng.Services;
@@ -32,7 +34,12 @@ public partial class MainWindow : Window
 
         _viewModel = new LauncherViewModel(engine);
         _viewModel.RequestHide += (_, _) => HideLauncher();
-        _viewModel.ResultsUpdated += (_, _) => UpdateLauncherHeight();
+        _viewModel.ResultsUpdated += (_, _) =>
+        {
+            UpdateLauncherHeight();
+            UpdateCompletionSuffixOffset();
+        };
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         DataContext = _viewModel;
 
         SourceInitialized += (_, _) => RegisterHotKey();
@@ -42,6 +49,10 @@ public partial class MainWindow : Window
             UpdateLauncherHeight();
             QueryBox.Focus();
         };
+
+        TextCompositionManager.AddPreviewTextInputStartHandler(QueryBox, QueryBox_TextInputStart);
+        TextCompositionManager.AddPreviewTextInputUpdateHandler(QueryBox, QueryBox_TextInputUpdate);
+        TextCompositionManager.AddPreviewTextInputHandler(QueryBox, QueryBox_TextInputCommitted);
     }
 
     public void ShowLauncher()
@@ -140,6 +151,12 @@ public partial class MainWindow : Window
                 _viewModel.ExecuteSelectedCommand.Execute(null);
                 e.Handled = true;
                 break;
+            case Key.Tab:
+                _viewModel.CompleteWithSelectedResult();
+                QueryBox.CaretIndex = QueryBox.Text.Length;
+                QueryBox.Focus();
+                e.Handled = true;
+                break;
             case Key.Down:
                 _viewModel.MoveSelection(1);
                 ResultsList.ScrollIntoView(_viewModel.SelectedResult);
@@ -156,6 +173,70 @@ public partial class MainWindow : Window
     private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         _viewModel.ExecuteSelectedCommand.Execute(null);
+    }
+
+    private void QueryBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        UpdateCompletionSuffixOffset();
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LauncherViewModel.CompletionSuffix)
+            or nameof(LauncherViewModel.QueryText)
+            or nameof(LauncherViewModel.SelectedResult))
+        {
+            Dispatcher.BeginInvoke(UpdateCompletionSuffixOffset);
+        }
+    }
+
+    private void QueryBox_TextInputStart(object sender, TextCompositionEventArgs e)
+    {
+        _viewModel.SetCompletionSuppressed(true);
+    }
+
+    private void QueryBox_TextInputUpdate(object sender, TextCompositionEventArgs e)
+    {
+        _viewModel.SetCompletionSuppressed(true);
+    }
+
+    private void QueryBox_TextInputCommitted(object sender, TextCompositionEventArgs e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            _viewModel.SetCompletionSuppressed(false);
+            UpdateCompletionSuffixOffset();
+        });
+    }
+
+    private void UpdateCompletionSuffixOffset()
+    {
+        if (CompletionSuffixText is null || QueryBox is null)
+        {
+            return;
+        }
+
+        CompletionSuffixText.Margin = new Thickness(MeasureInputTextWidth(), 0, 0, 0);
+    }
+
+    private double MeasureInputTextWidth()
+    {
+        if (string.IsNullOrEmpty(QueryBox.Text))
+        {
+            return 0;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(QueryBox);
+        var formattedText = new FormattedText(
+            QueryBox.Text,
+            CultureInfo.CurrentUICulture,
+            System.Windows.FlowDirection.LeftToRight,
+            new Typeface(QueryBox.FontFamily, QueryBox.FontStyle, QueryBox.FontWeight, QueryBox.FontStretch),
+            QueryBox.FontSize,
+            System.Windows.Media.Brushes.Transparent,
+            dpi.PixelsPerDip);
+
+        return formattedText.WidthIncludingTrailingWhitespace;
     }
 
     private async void SecondaryActionButton_Click(object sender, RoutedEventArgs e)

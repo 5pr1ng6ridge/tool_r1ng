@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:tool_r1ng.Controls"
         xmlns:local="clr-namespace:tool_r1ng"
         mc:Ignorable="d"
         Title="tool_r1ng"
@@ -125,9 +126,25 @@
                                    Text="&#xE721;" />
                     </Border>
 
-                    <TextBox x:Name="QueryBox"
-                             Grid.Column="1"
-                             Text="{Binding QueryText, UpdateSourceTrigger=PropertyChanged}" />
+                    <Grid Grid.Column="1">
+                        <TextBlock x:Name="CompletionSuffixText"
+                                   IsHitTestVisible="False"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{Binding ElementName=QueryBox, Path=FontFamily}"
+                                   FontSize="{Binding ElementName=QueryBox, Path=FontSize}"
+                                   FontStretch="{Binding ElementName=QueryBox, Path=FontStretch}"
+                                   FontStyle="{Binding ElementName=QueryBox, Path=FontStyle}"
+                                   FontWeight="{Binding ElementName=QueryBox, Path=FontWeight}"
+                                   Padding="0"
+                                   Foreground="#9A9A9A"
+                                   Text="{Binding CompletionSuffix, Mode=OneWay}"
+                                   TextOptions.TextFormattingMode="Display" />
+
+                        <TextBox x:Name="QueryBox"
+                                 TextOptions.TextFormattingMode="Display"
+                                 TextChanged="QueryBox_TextChanged"
+                                 Text="{Binding QueryText, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
 
                     <Button Grid.Column="2"
                             Width="32"
@@ -185,7 +202,7 @@
                                         </Image.Style>
                                     </Image>
 
-                                    <TextBlock FontSize="17"
+                                    <TextBlock FontSize="15"
                                                Foreground="{StaticResource LauncherAccentBrush}"
                                                Text="{Binding IconGlyph}">
                                         <TextBlock.Style>
@@ -205,11 +222,12 @@
                             <StackPanel Grid.Column="1"
                                         VerticalAlignment="Center"
                                         Margin="0,-1,0,0">
-                                <TextBlock FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource LauncherTextBrush}"
-                                           Text="{Binding Title}"
-                                           TextTrimming="CharacterEllipsis" />
+                                <controls:HighlightedTextBlock FontSize="15"
+                                                               FontWeight="Normal"
+                                                               Foreground="{StaticResource LauncherTextBrush}"
+                                                               PlainText="{Binding Title}"
+                                                               Segments="{Binding HighlightedTitle}"
+                                                               TextTrimming="CharacterEllipsis" />
                                 <TextBlock Margin="0,1,0,0"
                                            FontSize="12"
                                            Foreground="{StaticResource LauncherMutedBrush}"

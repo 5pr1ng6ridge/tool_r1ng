@@ -29,23 +29,29 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
             .Select(app => new
             {
                 App = app,
-                Score = app.Priority + Math.Max(
-                    FuzzyMatcher.Score(app.Name, context.Query),
-                    FuzzyMatcher.Score(app.SearchText, context.Query) * 0.75)
+                NameMatch = FuzzyMatcher.Match(app.Name, context.Query),
+                SearchTextScore = FuzzyMatcher.Score(app.SearchText, context.Query) * 0.75
+            })
+            .Select(item => new
+            {
+                item.App,
+                item.NameMatch,
+                Score = item.App.Priority + Math.Max(item.NameMatch.Score, item.SearchTextScore)
             })
             .Where(item => item.Score >= 28)
             .OrderByDescending(item => item.Score)
             .ThenBy(item => item.App.Name)
             .Take(8)
-            .Select(item => CreateResult(item.App, item.Score))
+            .Select(item => CreateResult(item.App, item.Score, item.NameMatch.MatchedIndices))
             .ToList();
     }
 
-    private QueryResult CreateResult(ApplicationEntry app, double score)
+    private QueryResult CreateResult(ApplicationEntry app, double score, IReadOnlyList<int> matchedTitleIndices)
     {
         return new QueryResult
         {
             Title = app.Name,
+            HighlightedTitle = HighlightBuilder.Build(app.Name, matchedTitleIndices),
             Subtitle = app.Location,
             IconGlyph = "\uECAA",
             IconImage = IconLoader.LoadAssociatedIcon(app.IconPath)
