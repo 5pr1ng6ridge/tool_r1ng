@@ -1,8 +1,6 @@
 using System.ComponentModel;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using tool_r1ng.Core;
 using tool_r1ng.Providers;
 using tool_r1ng.Services;
@@ -17,6 +15,7 @@ public partial class MainWindow : Window
     private const double FooterHeight = 12;
     private const double ResultsListVerticalSpacing = 14;
     private const double ResultRowHeight = 64;
+    private const double SettingsPanelHeight = 178;
 
     private readonly LauncherViewModel _viewModel;
     private readonly GlobalHotKeyService _hotKeyService = new();
@@ -26,20 +25,22 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        var settings = LauncherSettings.Load();
         var engine = new LauncherEngine([
             new CalculatorProvider(),
-            new ApplicationsProvider(),
+            new ApplicationsProvider(settings),
+            new EverythingProvider(settings),
+            new WindowTitleProvider(),
             new WebSearchProvider()
         ]);
+        _ = engine.WarmUpAsync(CancellationToken.None);
 
-        _viewModel = new LauncherViewModel(engine);
+        _viewModel = new LauncherViewModel(engine, settings);
         _viewModel.RequestHide += (_, _) => HideLauncher();
         _viewModel.ResultsUpdated += (_, _) =>
         {
             UpdateLauncherHeight();
-            UpdateCompletionSuffixOffset();
         };
-        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         DataContext = _viewModel;
 
         SourceInitialized += (_, _) => RegisterHotKey();
@@ -124,7 +125,9 @@ public partial class MainWindow : Window
 
     private void UpdateLauncherHeight()
     {
-        var desiredHeight = _viewModel.Results.Count == 0
+        var desiredHeight = _viewModel.IsSettingsVisible
+            ? HeaderHeight + SettingsPanelHeight + FooterHeight
+            : _viewModel.Results.Count == 0
             ? HeaderHeight
             : HeaderHeight
               + FooterHeight
@@ -153,8 +156,11 @@ public partial class MainWindow : Window
                 break;
             case Key.Tab:
                 _viewModel.CompleteWithSelectedResult();
-                QueryBox.CaretIndex = QueryBox.Text.Length;
-                QueryBox.Focus();
+                Dispatcher.BeginInvoke(() =>
+                {
+                    QueryBox.CaretIndex = QueryBox.Text.Length;
+                    QueryBox.Focus();
+                });
                 e.Handled = true;
                 break;
             case Key.Down:
@@ -175,21 +181,6 @@ public partial class MainWindow : Window
         _viewModel.ExecuteSelectedCommand.Execute(null);
     }
 
-    private void QueryBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-    {
-        UpdateCompletionSuffixOffset();
-    }
-
-    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(LauncherViewModel.CompletionSuffix)
-            or nameof(LauncherViewModel.QueryText)
-            or nameof(LauncherViewModel.SelectedResult))
-        {
-            Dispatcher.BeginInvoke(UpdateCompletionSuffixOffset);
-        }
-    }
-
     private void QueryBox_TextInputStart(object sender, TextCompositionEventArgs e)
     {
         _viewModel.SetCompletionSuppressed(true);
@@ -205,38 +196,49 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() =>
         {
             _viewModel.SetCompletionSuppressed(false);
-            UpdateCompletionSuffixOffset();
         });
     }
 
-    private void UpdateCompletionSuffixOffset()
+    private async void EverythingFileSearchToggle_Click(object sender, RoutedEventArgs e)
     {
-        if (CompletionSuffixText is null || QueryBox is null)
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
         {
             return;
         }
 
-        CompletionSuffixText.Margin = new Thickness(MeasureInputTextWidth(), 0, 0, 0);
+        await _viewModel.SetEverythingFileSearchEnabledAsync(toggle.IsChecked == true);
     }
 
-    private double MeasureInputTextWidth()
+    private async void EverythingAppSearchToggle_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(QueryBox.Text))
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
         {
-            return 0;
+            return;
         }
 
-        var dpi = VisualTreeHelper.GetDpi(QueryBox);
-        var formattedText = new FormattedText(
-            QueryBox.Text,
-            CultureInfo.CurrentUICulture,
-            System.Windows.FlowDirection.LeftToRight,
-            new Typeface(QueryBox.FontFamily, QueryBox.FontStyle, QueryBox.FontWeight, QueryBox.FontStretch),
-            QueryBox.FontSize,
-            System.Windows.Media.Brushes.Transparent,
-            dpi.PixelsPerDip);
+        await _viewModel.SetEverythingAppSearchEnabledAsync(toggle.IsChecked == true);
+    }
 
-        return formattedText.WidthIncludingTrailingWhitespace;
+    private async void InlineActionButton_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+
+        if (sender is not FrameworkElement { DataContext: QueryResult result }
+            || result.InlineActionAsync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await result.InlineActionAsync(CancellationToken.None);
+            await _viewModel.RefreshResultsAsync();
+            _viewModel.StatusText = result.InlineActionSuccessStatusText;
+        }
+        catch (Exception exception)
+        {
+            _viewModel.StatusText = exception.Message;
+        }
     }
 
     private async void SecondaryActionButton_Click(object sender, RoutedEventArgs e)

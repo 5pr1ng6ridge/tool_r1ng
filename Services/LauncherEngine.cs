@@ -14,7 +14,10 @@ public sealed class LauncherEngine
     public async Task<IReadOnlyList<QueryResult>> SearchAsync(string rawQuery, CancellationToken cancellationToken)
     {
         var context = new QueryContext(rawQuery);
-        var providerTasks = _providers.Select(provider => QueryProviderAsync(provider, context, cancellationToken));
+        var providers = context.IsControlQuery
+            ? _providers.Where(provider => provider.Id.Equals("controls", StringComparison.OrdinalIgnoreCase))
+            : _providers.Where(provider => !provider.Id.Equals("controls", StringComparison.OrdinalIgnoreCase));
+        var providerTasks = providers.Select(provider => QueryProviderAsync(provider, context, cancellationToken));
         var providerResults = await Task.WhenAll(providerTasks);
 
         return providerResults
@@ -23,6 +26,15 @@ public sealed class LauncherEngine
             .ThenBy(result => result.Title)
             .Take(12)
             .ToList();
+    }
+
+    public async Task WarmUpAsync(CancellationToken cancellationToken)
+    {
+        var providerTasks = _providers
+            .OfType<IWarmUpProvider>()
+            .Select(provider => WarmUpProviderAsync(provider, cancellationToken));
+
+        await Task.WhenAll(providerTasks);
     }
 
     private static async Task<IReadOnlyList<QueryResult>> QueryProviderAsync(
@@ -42,6 +54,22 @@ public sealed class LauncherEngine
         catch
         {
             return Array.Empty<QueryResult>();
+        }
+    }
+
+    private static async Task WarmUpProviderAsync(IWarmUpProvider provider, CancellationToken cancellationToken)
+    {
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await provider.WarmUpAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
         }
     }
 }

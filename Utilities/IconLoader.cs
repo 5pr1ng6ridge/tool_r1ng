@@ -32,6 +32,11 @@ public static class IconLoader
                 return LoadShellIcon(path);
             }
 
+            if (Directory.Exists(path))
+            {
+                return LoadShellIcon(path);
+            }
+
             if (!File.Exists(path))
             {
                 return null;

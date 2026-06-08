@@ -27,6 +27,41 @@
             <Setter Property="HorizontalAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="SettingsSwitch" TargetType="ToggleButton">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Track"
+                                Width="48"
+                                Height="26"
+                                Background="#DCD6CB"
+                                CornerRadius="13">
+                            <Ellipse x:Name="Knob"
+                                     Width="20"
+                                     Height="20"
+                                     Margin="3"
+                                     HorizontalAlignment="Left"
+                                     Fill="#FFFFFF" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource LauncherAccentBrush}" />
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="TextBox">
             <Setter Property="Foreground" Value="{StaticResource LauncherTextBrush}" />
             <Setter Property="CaretBrush" Value="{StaticResource LauncherAccentBrush}" />
@@ -126,25 +161,10 @@
                                    Text="&#xE721;" />
                     </Border>
 
-                    <Grid Grid.Column="1">
-                        <TextBlock x:Name="CompletionSuffixText"
-                                   IsHitTestVisible="False"
-                                   VerticalAlignment="Center"
-                                   FontFamily="{Binding ElementName=QueryBox, Path=FontFamily}"
-                                   FontSize="{Binding ElementName=QueryBox, Path=FontSize}"
-                                   FontStretch="{Binding ElementName=QueryBox, Path=FontStretch}"
-                                   FontStyle="{Binding ElementName=QueryBox, Path=FontStyle}"
-                                   FontWeight="{Binding ElementName=QueryBox, Path=FontWeight}"
-                                   Padding="0"
-                                   Foreground="#9A9A9A"
-                                   Text="{Binding CompletionSuffix, Mode=OneWay}"
-                                   TextOptions.TextFormattingMode="Display" />
-
-                        <TextBox x:Name="QueryBox"
-                                 TextOptions.TextFormattingMode="Display"
-                                 TextChanged="QueryBox_TextChanged"
-                                 Text="{Binding QueryText, UpdateSourceTrigger=PropertyChanged}" />
-                    </Grid>
+                    <TextBox x:Name="QueryBox"
+                             Grid.Column="1"
+                             TextOptions.TextFormattingMode="Display"
+                             Text="{Binding QueryText, UpdateSourceTrigger=PropertyChanged}" />
 
                     <Button Grid.Column="2"
                             Width="32"
@@ -162,12 +182,139 @@
                 </Grid>
             </Border>
 
+            <Border Grid.Row="1"
+                    Margin="16,12,16,4"
+                    Padding="16,12"
+                    Background="#FFFFFF"
+                    BorderBrush="#E4DECF"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSettingsVisible}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="1" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource LauncherTextBrush}"
+                                       Text="设置" />
+                            <TextBlock Margin="0,3,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource LauncherMutedBrush}"
+                                       Text="{Binding EverythingStatusText}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <Border Grid.Column="1"
+                                MinWidth="74"
+                                Height="24"
+                                Padding="10,0"
+                                VerticalAlignment="Center"
+                                Background="#F1ECE0"
+                                CornerRadius="8">
+                            <TextBlock HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="11"
+                                       Foreground="#586062"
+                                       Text="Everything" />
+                        </Border>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Margin="0,10,0,8"
+                            Background="#EFE7DA" />
+
+                    <Grid Grid.Row="2"
+                          MinHeight="46">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource LauncherTextBrush}"
+                                       Text="文件搜索" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource LauncherMutedBrush}"
+                                       Text="使用 Everything 索引搜索本地文件" />
+                        </StackPanel>
+
+                        <ToggleButton Grid.Column="1"
+                                      Style="{StaticResource SettingsSwitch}"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding EverythingFileSearchEnabled, Mode=OneWay}"
+                                      Click="EverythingFileSearchToggle_Click" />
+                    </Grid>
+
+                    <Grid Grid.Row="3"
+                          MinHeight="46"
+                          Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource LauncherTextBrush}"
+                                       Text="应用搜索" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource LauncherMutedBrush}"
+                                       Text="使用 Everything 索引加载开始菜单和桌面应用" />
+                        </StackPanel>
+
+                        <ToggleButton Grid.Column="1"
+                                      Style="{StaticResource SettingsSwitch}"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding EverythingAppSearchEnabled, Mode=OneWay}"
+                                      Click="EverythingAppSearchToggle_Click" />
+                    </Grid>
+                </Grid>
+            </Border>
+
             <ListBox x:Name="ResultsList"
                      Grid.Row="1"
                      Margin="6,10,6,4"
                      ItemsSource="{Binding Results}"
                      MouseDoubleClick="ResultsList_MouseDoubleClick"
                      SelectedItem="{Binding SelectedResult, Mode=TwoWay}">
+                <ListBox.Style>
+                    <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsResultsVisible}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.Style>
+
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid>
@@ -246,6 +393,32 @@
                                         Background="#F7F3EA"
                                         BorderBrush="#E1D8CA"
                                         BorderThickness="1"
+                                        Click="InlineActionButton_Click"
+                                        Cursor="Hand"
+                                        ToolTip="{Binding InlineActionToolTip}">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasInlineAction}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock Style="{StaticResource IconText}"
+                                               FontSize="14"
+                                               Foreground="{StaticResource LauncherMutedBrush}"
+                                               Text="{Binding InlineActionGlyph}" />
+                                </Button>
+
+                                <Button Width="30"
+                                        Height="28"
+                                        Margin="0,0,8,0"
+                                        Padding="0"
+                                        Background="#F7F3EA"
+                                        BorderBrush="#E1D8CA"
+                                        BorderThickness="1"
                                         Click="SecondaryActionButton_Click"
                                         Cursor="Hand"
                                         ToolTip="{Binding SecondaryActionToolTip}">
@@ -262,7 +435,7 @@
                                     <TextBlock Style="{StaticResource IconText}"
                                                FontSize="14"
                                                Foreground="{StaticResource LauncherMutedBrush}"
-                                               Text="&#xE8B7;" />
+                                               Text="{Binding SecondaryActionGlyph}" />
                                 </Button>
 
                                 <Border MinWidth="58"

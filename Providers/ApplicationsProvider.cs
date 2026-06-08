@@ -7,14 +7,26 @@ using tool_r1ng.Utilities;
 
 namespace tool_r1ng.Providers;
 
-public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
+public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmUpProvider
 {
+    private readonly LauncherSettings _settings;
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private IReadOnlyList<ApplicationEntry>? _cachedApps;
+    private int _cachedSettingsVersion = -1;
+
+    public ApplicationsProvider(LauncherSettings settings)
+    {
+        _settings = settings;
+    }
 
     public string Id => "applications";
 
     public string Name => "Apps";
+
+    public async Task WarmUpAsync(CancellationToken cancellationToken)
+    {
+        _ = await EnsureCacheAsync(cancellationToken);
+    }
 
     public async ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
@@ -69,7 +81,7 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
 
     private async Task<IReadOnlyList<ApplicationEntry>> EnsureCacheAsync(CancellationToken cancellationToken)
     {
-        if (_cachedApps is not null)
+        if (_cachedApps is not null && _cachedSettingsVersion == _settings.Version)
         {
             return _cachedApps;
         }
@@ -77,12 +89,13 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
         await _cacheLock.WaitAsync(cancellationToken);
         try
         {
-            if (_cachedApps is not null)
+            if (_cachedApps is not null && _cachedSettingsVersion == _settings.Version)
             {
                 return _cachedApps;
             }
 
             _cachedApps = await Task.Run(LoadApplications, cancellationToken);
+            _cachedSettingsVersion = _settings.Version;
             return _cachedApps;
         }
         finally
@@ -91,7 +104,7 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
         }
     }
 
-    private static IReadOnlyList<ApplicationEntry> LoadApplications()
+    private IReadOnlyList<ApplicationEntry> LoadApplications()
     {
         var entries = new List<ApplicationEntry>();
         AddEntries(entries, LoadShortcutApplications);
@@ -126,7 +139,7 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
         }
     }
 
-    private static IEnumerable<ApplicationEntry> LoadShortcutApplications()
+    private IEnumerable<ApplicationEntry> LoadShortcutApplications()
     {
         var roots = new[]
         {
@@ -136,7 +149,26 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
             Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
         };
 
-        foreach (var root in roots.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+        var existingRoots = roots
+            .Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (_settings.EnableEverythingAppSearch)
+        {
+            var everythingEntries = LoadShortcutApplicationsFromEverything(existingRoots).ToArray();
+            if (everythingEntries.Length > 0)
+            {
+                foreach (var entry in everythingEntries)
+                {
+                    yield return entry;
+                }
+
+                yield break;
+            }
+        }
+
+        foreach (var root in existingRoots)
         {
             foreach (var file in EnumerateLaunchableFiles(root))
             {
@@ -153,6 +185,51 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
                     file,
                     GetRelativeLocation(root, file),
                     24);
+            }
+        }
+    }
+
+    private static IEnumerable<ApplicationEntry> LoadShortcutApplicationsFromEverything(IReadOnlyCollection<string> roots)
+    {
+        if (roots.Count == 0)
+        {
+            yield break;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in roots)
+        {
+            IReadOnlyList<EverythingSearchResult> results;
+            try
+            {
+                results = EverythingClient.Search($"\"{root}\" ext:lnk;appref-ms;url", 1024, CancellationToken.None);
+            }
+            catch
+            {
+                yield break;
+            }
+
+            foreach (var result in results)
+            {
+                var file = result.FullPath;
+                if (result.IsFolder || !IsLaunchableShortcut(file) || !IsPathUnderRoot(file, root) || !seen.Add(file))
+                {
+                    continue;
+                }
+
+                var name = Path.GetFileNameWithoutExtension(file);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                yield return new ApplicationEntry(
+                    name,
+                    file,
+                    file,
+                    file,
+                    GetRelativeLocation(root, file),
+                    26);
             }
         }
     }
@@ -469,13 +546,29 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider
     {
         return EnumerateFilesSafely(
             root,
-            file =>
-            {
-                var extension = Path.GetExtension(file);
-                return extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)
-                    || extension.Equals(".appref-ms", StringComparison.OrdinalIgnoreCase)
-                    || extension.Equals(".url", StringComparison.OrdinalIgnoreCase);
-            });
+            IsLaunchableShortcut);
+    }
+
+    private static bool IsLaunchableShortcut(string file)
+    {
+        var extension = Path.GetExtension(file);
+        return extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".appref-ms", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".url", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPathUnderRoot(string file, string root)
+    {
+        try
+        {
+            var relativePath = Path.GetRelativePath(root, file);
+            return !relativePath.StartsWith("..", StringComparison.Ordinal)
+                && !Path.IsPathRooted(relativePath);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static IEnumerable<string> EnumerateExecutables(string root, int maxDepth)
