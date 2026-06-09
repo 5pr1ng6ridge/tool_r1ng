@@ -20,6 +20,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _mainWindow?.PrepareForShutdown();
         _trayIcon?.Dispose();
         base.OnExit(e);
     }

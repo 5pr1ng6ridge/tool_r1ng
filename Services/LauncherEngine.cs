@@ -14,10 +14,7 @@ public sealed class LauncherEngine
     public async Task<IReadOnlyList<QueryResult>> SearchAsync(string rawQuery, CancellationToken cancellationToken)
     {
         var context = new QueryContext(rawQuery);
-        var providers = context.IsControlQuery
-            ? _providers.Where(provider => provider.Id.Equals("controls", StringComparison.OrdinalIgnoreCase))
-            : _providers.Where(provider => !provider.Id.Equals("controls", StringComparison.OrdinalIgnoreCase));
-        var providerTasks = providers.Select(provider => QueryProviderAsync(provider, context, cancellationToken));
+        var providerTasks = _providers.Select(provider => QueryProviderAsync(provider, context, cancellationToken));
         var providerResults = await Task.WhenAll(providerTasks);
 
         return providerResults

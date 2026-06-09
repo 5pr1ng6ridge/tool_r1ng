@@ -25,6 +25,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private bool _everythingFileSearchEnabled;
     private bool _everythingAppSearchEnabled;
     private string _everythingStatusText = string.Empty;
+    private bool _isRefreshingEverythingStatus;
 
     public LauncherViewModel(LauncherEngine engine, LauncherSettings settings)
     {
@@ -32,7 +33,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         _settings = settings;
         _everythingFileSearchEnabled = settings.EnableEverythingFileSearch;
         _everythingAppSearchEnabled = settings.EnableEverythingAppSearch;
-        RefreshEverythingStatus();
+        EverythingStatusText = "Everything 状态未检测";
         _executeSelectedCommand = new AsyncRelayCommand(_ => ExecuteSelectedAsync(), _ => SelectedResult is not null);
         HideCommand = new AsyncRelayCommand(_ =>
         {
@@ -71,6 +72,10 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CompletionPrefix));
             OnPropertyChanged(nameof(IsSettingsVisible));
             OnPropertyChanged(nameof(IsResultsVisible));
+            if (IsSettingsVisible)
+            {
+                _ = RefreshEverythingStatusAsync();
+            }
 
             if (value.Length < previousText.Length)
             {
@@ -322,7 +327,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
         _settings.SetEverythingFileSearch(isEnabled);
         EverythingFileSearchEnabled = isEnabled;
-        RefreshEverythingStatus();
+        await RefreshEverythingStatusAsync();
         StatusText = isEnabled ? "Everything 文件搜索已启用" : "Everything 文件搜索已停用";
     }
 
@@ -336,9 +341,9 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
         _settings.SetEverythingAppSearch(isEnabled);
         EverythingAppSearchEnabled = isEnabled;
-        RefreshEverythingStatus();
-        StatusText = isEnabled ? "Everything 应用搜索已启用" : "Everything 应用搜索已停用";
+        await RefreshEverythingStatusAsync();
         await RefreshResultsAsync();
+        StatusText = isEnabled ? "Everything 应用搜索已启用" : "Everything 应用搜索已停用";
     }
 
     private async Task ExecuteSelectedAsync()
@@ -396,11 +401,28 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         return false;
     }
 
-    private void RefreshEverythingStatus()
+    private async Task RefreshEverythingStatusAsync()
     {
-        EverythingStatusText = EverythingClient.TryCheckAvailability(out var message)
-            ? "Everything 已就绪"
-            : message;
+        if (_isRefreshingEverythingStatus)
+        {
+            return;
+        }
+
+        _isRefreshingEverythingStatus = true;
+        try
+        {
+            var status = await Task.Run(() =>
+            {
+                var isAvailable = EverythingClient.TryCheckAvailability(out var message);
+                return new EverythingAvailability(isAvailable, message);
+            });
+
+            EverythingStatusText = status.IsAvailable ? "Everything 已就绪" : status.Message;
+        }
+        finally
+        {
+            _isRefreshingEverythingStatus = false;
+        }
     }
 
     private void UpdateCompletionSuffix()

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -25,7 +26,7 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
     private const nint WsThickFrame = 0x00040000;
     private const nint WsMaximizeBox = 0x00010000;
 
-    private static readonly Dictionary<nint, LockedWindowState> LockedWindows = [];
+    private static readonly ConcurrentDictionary<nint, LockedWindowState> LockedWindows = [];
 
     public string Id => "windows";
 
@@ -59,13 +60,13 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
         var isLocked = IsWindowLocked(window.Handle);
         var subtitle = string.IsNullOrWhiteSpace(window.ProcessName)
             ? "Open window"
-            : $"Open window · {window.ProcessName}";
+            : $"Open window - {window.ProcessName}";
 
         return new QueryResult
         {
             Title = window.Title,
             HighlightedTitle = HighlightBuilder.Build(window.Title, match.MatchedIndices),
-            Subtitle = isLocked ? $"{subtitle} · Locked" : subtitle,
+            Subtitle = isLocked ? $"{subtitle} - Locked" : subtitle,
             IconGlyph = "\uE7C4",
             ProviderId = Id,
             ProviderName = Name,
@@ -83,6 +84,7 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
 
     private static IEnumerable<WindowEntry> EnumerateWindows()
     {
+        PruneClosedLockedWindows();
         var currentProcessId = Environment.ProcessId;
         var windows = new List<WindowEntry>();
 
@@ -153,13 +155,11 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
 
     private static void LockWindow(IntPtr handle)
     {
-        if (LockedWindows.ContainsKey(handle))
+        var originalStyle = GetWindowLongPtr(handle, GwlStyle);
+        if (!LockedWindows.TryAdd(handle, new LockedWindowState(originalStyle)))
         {
             return;
         }
-
-        var originalStyle = GetWindowLongPtr(handle, GwlStyle);
-        LockedWindows[handle] = new LockedWindowState(originalStyle);
 
         var lockedStyle = originalStyle & ~WsThickFrame & ~WsMaximizeBox;
         _ = SetWindowLongPtr(handle, GwlStyle, lockedStyle);
@@ -170,7 +170,7 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
 
     private static void UnlockWindow(IntPtr handle)
     {
-        if (!LockedWindows.Remove(handle, out var state))
+        if (!LockedWindows.TryRemove(handle, out var state))
         {
             return;
         }
@@ -184,6 +184,17 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
     private static bool IsWindowLocked(IntPtr handle)
     {
         return LockedWindows.ContainsKey(handle);
+    }
+
+    private static void PruneClosedLockedWindows()
+    {
+        foreach (var handle in LockedWindows.Keys)
+        {
+            if (!IsWindow(handle))
+            {
+                _ = LockedWindows.TryRemove(handle, out _);
+            }
+        }
     }
 
     private static void SetSystemMenuCommandState(IntPtr handle, uint command, bool isEnabled)
@@ -230,6 +241,9 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr handle);
 
     [DllImport("user32.dll")]
     private static extern int GetWindowTextLength(IntPtr handle);
