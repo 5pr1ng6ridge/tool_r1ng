@@ -39,7 +39,7 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
             });
         }
 
-        if (query.Length >= 2)
+        if (query.Length >= 1)
         {
             var searchText = query.StartsWith("?", StringComparison.Ordinal)
                 ? query[1..].Trim()

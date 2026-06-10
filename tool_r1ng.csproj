@@ -10,4 +10,11 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="Everything-SDK\**\*.cs" />
+    <EmbeddedResource Remove="Everything-SDK\**\*" />
+    <None Remove="Everything-SDK\**\*" />
+    <Page Remove="Everything-SDK\**\*.xaml" />
+  </ItemGroup>
+
 </Project>

@@ -24,9 +24,10 @@ public static class FuzzyMatcher
         }
 
         var acronymMatch = MatchAcronym(candidate, normalizedQuery);
+        var pinyinInitialMatch = MatchPinyinInitials(candidate, normalizedQuery);
         var tokenMatch = MatchTokens(candidate, normalizedQuery);
         var subsequenceMatch = MatchSubsequence(normalizedCandidate, normalizedQuery);
-        return new[] { acronymMatch, tokenMatch, subsequenceMatch }
+        return new[] { acronymMatch, pinyinInitialMatch, tokenMatch, subsequenceMatch }
             .OrderByDescending(match => match.Score)
             .First();
     }
@@ -169,6 +170,36 @@ public static class FuzzyMatcher
 
         return new FuzzyMatchResult(
             42 + bestRun * 4 - Math.Min(20, candidate.Length - query.Length),
+            matchedIndices);
+    }
+
+    private static FuzzyMatchResult MatchPinyinInitials(string candidate, string query)
+    {
+        if (query.Length < 2 || query.Any(character => character is < 'a' or > 'z'))
+        {
+            return FuzzyMatchResult.Empty;
+        }
+
+        var initials = PinyinInitials.Build(candidate);
+        if (initials.Count == 0 || query.Length > initials.Count)
+        {
+            return FuzzyMatchResult.Empty;
+        }
+
+        var matchedIndices = new List<int>(query.Length);
+        for (var index = 0; index < query.Length; index++)
+        {
+            var initial = initials[index];
+            if (initial.Initial != query[index])
+            {
+                return FuzzyMatchResult.Empty;
+            }
+
+            matchedIndices.Add(initial.Index);
+        }
+
+        return new FuzzyMatchResult(
+            104 - Math.Min(16, initials.Count - query.Length),
             matchedIndices);
     }
 

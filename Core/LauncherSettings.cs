@@ -15,6 +15,10 @@ public sealed class LauncherSettings
 
     public bool EnableEverythingAppSearch { get; set; }
 
+    public bool EnableAcrylicBackdrop { get; set; } = true;
+
+    public double AcrylicOpacity { get; set; } = 0.7;
+
     public int Version { get; set; }
 
     public static LauncherSettings Load()
@@ -26,12 +30,14 @@ public sealed class LauncherSettings
                 return new LauncherSettings();
             }
 
-            return JsonSerializer.Deserialize<LauncherSettings>(
+            var settings = JsonSerializer.Deserialize<LauncherSettings>(
                 File.ReadAllText(SettingsPath),
                 new JsonSerializerOptions
                 {
                     IncludeFields = false
                 }) ?? new LauncherSettings();
+            settings.AcrylicOpacity = NormalizeAcrylicOpacity(settings.AcrylicOpacity);
+            return settings;
         }
         catch
         {
@@ -59,6 +65,34 @@ public sealed class LauncherSettings
 
         EnableEverythingAppSearch = isEnabled;
         Save();
+    }
+
+    public void SetAcrylicBackdrop(bool isEnabled)
+    {
+        if (EnableAcrylicBackdrop == isEnabled)
+        {
+            return;
+        }
+
+        EnableAcrylicBackdrop = isEnabled;
+        Save();
+    }
+
+    public void SetAcrylicOpacity(double opacity)
+    {
+        var normalizedOpacity = NormalizeAcrylicOpacity(opacity);
+        if (Math.Abs(AcrylicOpacity - normalizedOpacity) < 0.001)
+        {
+            return;
+        }
+
+        AcrylicOpacity = normalizedOpacity;
+        Save();
+    }
+
+    private static double NormalizeAcrylicOpacity(double opacity)
+    {
+        return Math.Clamp(opacity, 0.15, 0.90);
     }
 
     private void Save()

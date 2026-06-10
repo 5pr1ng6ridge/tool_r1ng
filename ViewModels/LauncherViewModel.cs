@@ -26,6 +26,8 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private bool _everythingAppSearchEnabled;
     private string _everythingStatusText = string.Empty;
     private bool _isRefreshingEverythingStatus;
+    private bool _acrylicBackdropEnabled;
+    private double _acrylicOpacity;
 
     public LauncherViewModel(LauncherEngine engine, LauncherSettings settings)
     {
@@ -33,6 +35,8 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         _settings = settings;
         _everythingFileSearchEnabled = settings.EnableEverythingFileSearch;
         _everythingAppSearchEnabled = settings.EnableEverythingAppSearch;
+        _acrylicBackdropEnabled = settings.EnableAcrylicBackdrop;
+        _acrylicOpacity = settings.AcrylicOpacity;
         EverythingStatusText = "Everything 状态未检测";
         _executeSelectedCommand = new AsyncRelayCommand(_ => ExecuteSelectedAsync(), _ => SelectedResult is not null);
         HideCommand = new AsyncRelayCommand(_ =>
@@ -47,6 +51,8 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     public event EventHandler? RequestHide;
 
     public event EventHandler? ResultsUpdated;
+
+    public event EventHandler? AppearanceSettingsChanged;
 
     public ObservableCollection<QueryResult> Results { get; } = [];
 
@@ -203,6 +209,39 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool AcrylicBackdropEnabled
+    {
+        get => _acrylicBackdropEnabled;
+        private set
+        {
+            if (_acrylicBackdropEnabled == value)
+            {
+                return;
+            }
+
+            _acrylicBackdropEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public double AcrylicOpacity
+    {
+        get => _acrylicOpacity;
+        private set
+        {
+            if (Math.Abs(_acrylicOpacity - value) < 0.001)
+            {
+                return;
+            }
+
+            _acrylicOpacity = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AcrylicOpacityPercent));
+        }
+    }
+
+    public string AcrylicOpacityPercent => $"{Math.Round(AcrylicOpacity * 100):0}%";
+
     public async Task RefreshResultsAsync()
     {
         _searchCancellation?.Cancel();
@@ -344,6 +383,22 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         await RefreshEverythingStatusAsync();
         await RefreshResultsAsync();
         StatusText = isEnabled ? "Everything 应用搜索已启用" : "Everything 应用搜索已停用";
+    }
+
+    public void SetAcrylicBackdropEnabled(bool isEnabled)
+    {
+        _settings.SetAcrylicBackdrop(isEnabled);
+        AcrylicBackdropEnabled = isEnabled;
+        AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
+        StatusText = isEnabled ? "亚克力效果已启用" : "亚克力效果已停用";
+    }
+
+    public void SetAcrylicOpacity(double opacity)
+    {
+        var normalizedOpacity = Math.Clamp(opacity, 0.15, 0.90);
+        _settings.SetAcrylicOpacity(normalizedOpacity);
+        AcrylicOpacity = normalizedOpacity;
+        AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task ExecuteSelectedAsync()

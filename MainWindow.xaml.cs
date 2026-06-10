@@ -1,25 +1,37 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
 using tool_r1ng.Core;
 using tool_r1ng.Providers;
 using tool_r1ng.Services;
+using tool_r1ng.Utilities;
 using tool_r1ng.ViewModels;
 
 namespace tool_r1ng;
 
 public partial class MainWindow : Window
 {
+    private const int WmActivate = 0x0006;
+    private const int WmShowWindow = 0x0018;
+    private const int WmWindowPosChanged = 0x0047;
+    private const int WmSettingChange = 0x001A;
+    private const int WmThemeChanged = 0x031A;
+    private const int WmDwmCompositionChanged = 0x031E;
     private const double LauncherMaxHeight = 500;
     private const double HeaderHeight = 52;
     private const double FooterHeight = 12;
     private const double ResultsListVerticalSpacing = 14;
     private const double ResultRowHeight = 64;
-    private const double SettingsPanelHeight = 178;
+    private const double SettingsPanelHeight = 278;
 
     private readonly LauncherViewModel _viewModel;
     private readonly GlobalHotKeyService _hotKeyService = new();
+    private HwndSource? _windowSource;
     private bool _allowClose;
+    private int _appearanceRefreshVersion;
 
     public MainWindow()
     {
@@ -41,13 +53,21 @@ public partial class MainWindow : Window
         {
             UpdateLauncherHeight();
         };
+        _viewModel.AppearanceSettingsChanged += (_, _) => RefreshAppearance();
         DataContext = _viewModel;
 
-        SourceInitialized += (_, _) => RegisterHotKey();
+        SourceInitialized += (_, _) =>
+        {
+            _windowSource = (HwndSource?)PresentationSource.FromVisual(this);
+            _windowSource?.AddHook(WindowMessageHook);
+            RefreshAppearance();
+            RegisterHotKey();
+        };
         Loaded += async (_, _) =>
         {
             await _viewModel.RefreshResultsAsync();
             UpdateLauncherHeight();
+            RefreshAppearance();
             QueryBox.Focus();
         };
 
@@ -62,8 +82,10 @@ public partial class MainWindow : Window
         UpdateLauncherHeight();
         Show();
         Activate();
+        UpdateLayout();
         QueryBox.Focus();
         QueryBox.SelectAll();
+        RefreshAppearance();
     }
 
     public void PrepareForShutdown()
@@ -82,6 +104,13 @@ public partial class MainWindow : Window
         }
 
         base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _windowSource?.RemoveHook(WindowMessageHook);
+        _windowSource = null;
+        base.OnClosed(e);
     }
 
     private void RegisterHotKey()
@@ -113,6 +142,23 @@ public partial class MainWindow : Window
     private void HideLauncher()
     {
         Hide();
+    }
+
+    private nint WindowMessageHook(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    {
+        switch (message)
+        {
+            case WmShowWindow when wParam != nint.Zero:
+            case WmActivate when wParam != nint.Zero:
+            case WmWindowPosChanged when IsVisible:
+            case WmDwmCompositionChanged:
+            case WmThemeChanged:
+            case WmSettingChange:
+                RefreshAppearance();
+                break;
+        }
+
+        return nint.Zero;
     }
 
     private void CenterLauncher()
@@ -199,6 +245,120 @@ public partial class MainWindow : Window
         });
     }
 
+    private void ApplyAppearance()
+    {
+        WindowBackdropHelper.ApplyAcrylic(
+            this,
+            _viewModel.AcrylicBackdropEnabled,
+            _viewModel.AcrylicOpacity);
+
+        var opacity = _viewModel.AcrylicBackdropEnabled
+            ? _viewModel.AcrylicOpacity
+            : 0.96;
+
+        var rootOpacity = _viewModel.AcrylicBackdropEnabled
+            ? Math.Clamp(opacity * 0.56, 0.16, 0.62)
+            : opacity;
+        var headerOpacity = _viewModel.AcrylicBackdropEnabled
+            ? Math.Clamp(opacity * 0.44, 0.14, 0.54)
+            : 0.92;
+        var settingsOpacity = _viewModel.AcrylicBackdropEnabled
+            ? Math.Clamp(opacity * 0.72, 0.22, 0.78)
+            : 0.96;
+        var borderOpacity = _viewModel.AcrylicBackdropEnabled
+            ? Math.Clamp(opacity * 0.62, 0.18, 0.60)
+            : 0.62;
+
+        RootMaterial.Background = CreateWhiteBrush(rootOpacity);
+        HeaderMaterial.Background = CreateWhiteBrush(headerOpacity);
+        SettingsMaterial.Background = CreateWhiteBrush(settingsOpacity);
+        RootMaterial.BorderBrush = CreateBrush(borderOpacity, 214, 208, 195);
+        HeaderMaterial.BorderBrush = CreateBrush(borderOpacity * 0.82, 228, 222, 207);
+        SettingsMaterial.BorderBrush = CreateBrush(borderOpacity * 0.88, 228, 222, 207);
+    }
+
+    private void RefreshAppearance()
+    {
+        ApplyAppearance();
+        InvalidateAppearance();
+        ScheduleDeferredAppearanceRefresh();
+    }
+
+    private void ScheduleDeferredAppearanceRefresh()
+    {
+        var refreshVersion = ++_appearanceRefreshVersion;
+
+        Dispatcher.BeginInvoke(
+            (Action)(() =>
+            {
+                ApplyDeferredAppearanceRefresh(refreshVersion);
+            }),
+            DispatcherPriority.Render);
+
+        Dispatcher.BeginInvoke(
+            (Action)(() =>
+            {
+                ApplyDeferredAppearanceRefresh(refreshVersion);
+            }),
+            DispatcherPriority.ApplicationIdle);
+
+        _ = ApplyDelayedAppearanceRefreshAsync(refreshVersion);
+    }
+
+    private async Task ApplyDelayedAppearanceRefreshAsync(int refreshVersion)
+    {
+        foreach (var delay in new[] { 32, 96, 180 })
+        {
+            await Task.Delay(delay);
+
+            if (refreshVersion != _appearanceRefreshVersion)
+            {
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(
+                () => ApplyDeferredAppearanceRefresh(refreshVersion),
+                DispatcherPriority.Render);
+        }
+    }
+
+    private void ApplyDeferredAppearanceRefresh(int refreshVersion)
+    {
+        if (refreshVersion != _appearanceRefreshVersion || !IsVisible)
+        {
+            return;
+        }
+
+        ApplyAppearance();
+        InvalidateAppearance();
+    }
+
+    private void InvalidateAppearance()
+    {
+        RootMaterial.InvalidateVisual();
+        HeaderMaterial.InvalidateVisual();
+        SettingsMaterial.InvalidateVisual();
+        InvalidateVisual();
+        WindowBackdropHelper.RefreshComposition(this);
+    }
+
+    private static byte ToAlpha(double opacity)
+    {
+        return (byte)Math.Clamp(opacity * 255, 0, 255);
+    }
+
+    private static SolidColorBrush CreateWhiteBrush(double opacity)
+    {
+        return CreateBrush(opacity, 255, 255, 255);
+    }
+
+    private static SolidColorBrush CreateBrush(double opacity, byte red, byte green, byte blue)
+    {
+        var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(ToAlpha(opacity), red, green, blue));
+        brush.Freeze();
+        return brush;
+    }
+
     private async void EverythingFileSearchToggle_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
@@ -217,6 +377,26 @@ public partial class MainWindow : Window
         }
 
         await _viewModel.SetEverythingAppSearchEnabledAsync(toggle.IsChecked == true);
+    }
+
+    private void AcrylicBackdropToggle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Primitives.ToggleButton toggle)
+        {
+            return;
+        }
+
+        _viewModel.SetAcrylicBackdropEnabled(toggle.IsChecked == true);
+    }
+
+    private void AcrylicOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (DataContext is not LauncherViewModel viewModel)
+        {
+            return;
+        }
+
+        viewModel.SetAcrylicOpacity(e.NewValue);
     }
 
     private async void InlineActionButton_Click(object sender, RoutedEventArgs e)

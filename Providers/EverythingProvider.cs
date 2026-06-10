@@ -55,7 +55,7 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
 
         try
         {
-            var results = EverythingClient.Search(query, MaxResults, cancellationToken)
+            var results = EverythingClient.Search(query, MaxResults, cancellationToken, EverythingSearchProfile.UserSettings)
                 .Select(result => CreateResult(result, query, isForced))
                 .ToList();
 

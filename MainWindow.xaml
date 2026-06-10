@@ -12,7 +12,6 @@
         MinWidth="520"
         MinHeight="64"
         MaxHeight="500"
-        AllowsTransparency="True"
         Background="Transparent"
         Deactivated="Window_Deactivated"
         PreviewKeyDown="Window_PreviewKeyDown"
@@ -39,7 +38,7 @@
                         <Border x:Name="Track"
                                 Width="48"
                                 Height="26"
-                                Background="#DCD6CB"
+                                Background="#AADCD6CB"
                                 CornerRadius="13">
                             <Ellipse x:Name="Knob"
                                      Width="20"
@@ -105,11 +104,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="#FFF7EF" />
-                                <Setter TargetName="Row" Property="BorderBrush" Value="#FFF7EF" />
+                                <Setter TargetName="Row" Property="Background" Value="#88FFF7EF" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="#A8FFF7EF" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="#EAF3F2" />
+                                <Setter TargetName="Row" Property="Background" Value="#B8EAF3F2" />
                                 <Setter TargetName="Row" Property="BorderBrush" Value="#5bcffa" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -119,19 +118,12 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="#FFFFFF"
-            BorderBrush="#D6D0C3"
+    <Border x:Name="RootMaterial"
+            Background="#AAFFFFFF"
+            BorderBrush="#8FD6D0C3"
             BorderThickness="1"
             CornerRadius="10"
             SnapsToDevicePixels="True">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="34"
-                              Color="#151515"
-                              Direction="270"
-                              Opacity="0.25"
-                              ShadowDepth="16" />
-        </Border.Effect>
-
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="52" />
@@ -139,9 +131,10 @@
                 <RowDefinition Height="12" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0"
-                    Background="#FFFFFF"
-                    BorderBrush="#E4DECF"
+            <Border x:Name="HeaderMaterial"
+                    Grid.Row="0"
+                    Background="#99FFFFFF"
+                    BorderBrush="#80E4DECF"
                     BorderThickness="0,0,0,1"
                     CornerRadius="10,10,0,0">
                 <Grid Margin="20,0">
@@ -153,7 +146,7 @@
 
                     <Border Width="34"
                             Height="34"
-                            Background="#EAF3F2"
+                            Background="#175cbdff"
                             CornerRadius="8">
                         <TextBlock Style="{StaticResource IconText}"
                                    FontSize="18"
@@ -182,11 +175,12 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="1"
+            <Border x:Name="SettingsMaterial"
+                    Grid.Row="1"
                     Margin="16,12,16,4"
                     Padding="16,12"
-                    Background="#FFFFFF"
-                    BorderBrush="#E4DECF"
+                    Background="#9EFFFFFF"
+                    BorderBrush="#80E4DECF"
                     BorderThickness="1"
                     CornerRadius="8">
                 <Border.Style>
@@ -204,6 +198,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="1" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -231,7 +227,7 @@
                                 Height="24"
                                 Padding="10,0"
                                 VerticalAlignment="Center"
-                                Background="#F1ECE0"
+                                Background="#B8F1ECE0"
                                 CornerRadius="8">
                             <TextBlock HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
@@ -243,7 +239,7 @@
 
                     <Border Grid.Row="1"
                             Margin="0,10,0,8"
-                            Background="#EFE7DA" />
+                            Background="#90EFE7DA" />
 
                     <Grid Grid.Row="2"
                           MinHeight="46">
@@ -295,6 +291,65 @@
                                       IsChecked="{Binding EverythingAppSearchEnabled, Mode=OneWay}"
                                       Click="EverythingAppSearchToggle_Click" />
                     </Grid>
+
+                    <Grid Grid.Row="4"
+                          MinHeight="46"
+                          Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource LauncherTextBrush}"
+                                       Text="亚克力玻璃" />
+                            <TextBlock Margin="0,2,0,0"
+                                       FontSize="12"
+                                       Foreground="{StaticResource LauncherMutedBrush}"
+                                       Text="使用系统亚克力背景效果" />
+                        </StackPanel>
+
+                        <ToggleButton Grid.Column="1"
+                                      Style="{StaticResource SettingsSwitch}"
+                                      VerticalAlignment="Center"
+                                      IsChecked="{Binding AcrylicBackdropEnabled, Mode=OneWay}"
+                                      Click="AcrylicBackdropToggle_Click" />
+                    </Grid>
+
+                    <Grid Grid.Row="5"
+                          MinHeight="44"
+                          Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="48" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource LauncherTextBrush}"
+                                   Text="背景不透明度" />
+
+                        <Slider Grid.Column="1"
+                                Minimum="0.15"
+                                Maximum="0.90"
+                                TickFrequency="0.05"
+                                IsSnapToTickEnabled="False"
+                                IsEnabled="{Binding AcrylicBackdropEnabled, Mode=OneWay}"
+                                VerticalAlignment="Center"
+                                Value="{Binding AcrylicOpacity, Mode=OneWay}"
+                                ValueChanged="AcrylicOpacitySlider_ValueChanged" />
+
+                        <TextBlock Grid.Column="2"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="{StaticResource LauncherMutedBrush}"
+                                   Text="{Binding AcrylicOpacityPercent}" />
+                    </Grid>
                 </Grid>
             </Border>
 
@@ -326,8 +381,8 @@
 
                             <Border Width="34"
                                     Height="34"
-                                    Background="#FFFFFF"
-                                    BorderBrush="#E4DECF"
+                                    Background="#A8FFFFFF"
+                                    BorderBrush="#86E4DECF"
                                     BorderThickness="1"
                                     CornerRadius="8">
                                 <Grid>
@@ -390,8 +445,8 @@
                                         Height="28"
                                         Margin="0,0,8,0"
                                         Padding="0"
-                                        Background="#F7F3EA"
-                                        BorderBrush="#E1D8CA"
+                                        Background="#B8F7F3EA"
+                                        BorderBrush="#8FE1D8CA"
                                         BorderThickness="1"
                                         Click="InlineActionButton_Click"
                                         Cursor="Hand"
@@ -416,8 +471,8 @@
                                         Height="28"
                                         Margin="0,0,8,0"
                                         Padding="0"
-                                        Background="#F7F3EA"
-                                        BorderBrush="#E1D8CA"
+                                        Background="#B8F7F3EA"
+                                        BorderBrush="#8FE1D8CA"
                                         BorderThickness="1"
                                         Click="SecondaryActionButton_Click"
                                         Cursor="Hand"
@@ -442,7 +497,7 @@
                                         Height="24"
                                         Padding="9,0"
                                         VerticalAlignment="Center"
-                                        Background="#F1ECE0"
+                                        Background="#B8F1ECE0"
                                         CornerRadius="8">
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
