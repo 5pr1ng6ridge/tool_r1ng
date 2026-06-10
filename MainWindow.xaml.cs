@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private HwndSource? _windowSource;
     private bool _allowClose;
     private int _appearanceRefreshVersion;
+    private int _compositionPulseVersion;
 
     public MainWindow()
     {
@@ -67,7 +68,7 @@ public partial class MainWindow : Window
         {
             await _viewModel.RefreshResultsAsync();
             UpdateLauncherHeight();
-            RefreshAppearance();
+            RefreshAppearanceForWake();
             QueryBox.Focus();
         };
 
@@ -85,7 +86,7 @@ public partial class MainWindow : Window
         UpdateLayout();
         QueryBox.Focus();
         QueryBox.SelectAll();
-        RefreshAppearance();
+        RefreshAppearanceForWake();
     }
 
     public void PrepareForShutdown()
@@ -150,6 +151,8 @@ public partial class MainWindow : Window
         {
             case WmShowWindow when wParam != nint.Zero:
             case WmActivate when wParam != nint.Zero:
+                RefreshAppearanceForWake();
+                break;
             case WmWindowPosChanged when IsVisible:
             case WmDwmCompositionChanged:
             case WmThemeChanged:
@@ -284,6 +287,12 @@ public partial class MainWindow : Window
         ScheduleDeferredAppearanceRefresh();
     }
 
+    private void RefreshAppearanceForWake()
+    {
+        RefreshAppearance();
+        ScheduleCompositionPulse();
+    }
+
     private void ScheduleDeferredAppearanceRefresh()
     {
         var refreshVersion = ++_appearanceRefreshVersion;
@@ -303,6 +312,54 @@ public partial class MainWindow : Window
             DispatcherPriority.ApplicationIdle);
 
         _ = ApplyDelayedAppearanceRefreshAsync(refreshVersion);
+    }
+
+    private void ScheduleCompositionPulse()
+    {
+        var pulseVersion = ++_compositionPulseVersion;
+
+        Dispatcher.BeginInvoke(
+            (Action)(() => ApplyCompositionPulse(pulseVersion)),
+            DispatcherPriority.Render);
+
+        _ = ApplyDelayedCompositionPulseAsync(pulseVersion);
+    }
+
+    private async Task ApplyDelayedCompositionPulseAsync(int pulseVersion)
+    {
+        foreach (var delay in new[] { 24, 84, 168 })
+        {
+            await Task.Delay(delay);
+
+            if (pulseVersion != _compositionPulseVersion)
+            {
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(
+                () => ApplyCompositionPulse(pulseVersion),
+                DispatcherPriority.Render);
+        }
+    }
+
+    private void ApplyCompositionPulse(int pulseVersion)
+    {
+        if (pulseVersion != _compositionPulseVersion || !IsVisible)
+        {
+            return;
+        }
+
+        RefreshCompositionWithoutResize();
+    }
+
+    private void RefreshCompositionWithoutResize()
+    {
+        ApplyAppearance();
+        InvalidateAppearance();
+        WindowBackdropHelper.RefreshBackdropWithoutResize(
+            this,
+            _viewModel.AcrylicBackdropEnabled,
+            _viewModel.AcrylicOpacity);
     }
 
     private async Task ApplyDelayedAppearanceRefreshAsync(int refreshVersion)

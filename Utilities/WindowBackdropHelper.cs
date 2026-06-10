@@ -18,6 +18,13 @@ public static class WindowBackdropHelper
     private const uint RdwAllChildren = 0x0080;
     private const uint RdwUpdateNow = 0x0100;
     private const uint RdwFrame = 0x0400;
+    private const uint RdwErase = 0x0004;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+    private const uint SwpNoOwnerZOrder = 0x0200;
 
     public static void ApplyAcrylic(Window window, bool isEnabled, double opacity)
     {
@@ -56,6 +63,17 @@ public static class WindowBackdropHelper
         }
 
         TryRefreshComposition(handle);
+    }
+
+    public static void RefreshBackdropWithoutResize(Window window, bool isEnabled, double opacity)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == nint.Zero)
+        {
+            return;
+        }
+
+        TryRefreshBackdropWithoutResize(handle, isEnabled, opacity);
     }
 
     private static void PrepareTransparentClient(nint handle)
@@ -145,12 +163,51 @@ public static class WindowBackdropHelper
                 handle,
                 nint.Zero,
                 nint.Zero,
-                RdwInvalidate | RdwInternalPaint | RdwAllChildren | RdwUpdateNow | RdwFrame);
+                RdwInvalidate | RdwInternalPaint | RdwErase | RdwAllChildren | RdwUpdateNow | RdwFrame);
             _ = DwmFlush();
         }
         catch
         {
         }
+    }
+
+    private static void TryRefreshBackdropWithoutResize(nint handle, bool isEnabled, double opacity)
+    {
+        try
+        {
+            PrepareTransparentClient(handle);
+            TryApplyAccentAcrylic(handle, false, opacity);
+            TryApplySystemBackdrop(handle, false);
+            TryRefreshFrameWithoutResize(handle);
+            _ = DwmFlush();
+
+            PrepareTransparentClient(handle);
+            if (isEnabled)
+            {
+                TryApplyAccentAcrylic(handle, false, opacity);
+                if (!TryApplySystemBackdrop(handle, true))
+                {
+                    TryApplyAccentAcrylic(handle, true, opacity);
+                }
+            }
+            else
+            {
+                TryApplyAccentAcrylic(handle, false, opacity);
+                TryApplySystemBackdrop(handle, false);
+            }
+
+            TryRefreshFrameWithoutResize(handle);
+            TryRefreshComposition(handle);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void TryRefreshFrameWithoutResize(nint handle)
+    {
+        const uint flags = SwpNoSize | SwpNoMove | SwpNoZOrder | SwpNoActivate | SwpFrameChanged | SwpNoOwnerZOrder;
+        _ = SetWindowPos(handle, nint.Zero, 0, 0, 0, 0, flags);
     }
 
     private static void TryApplyRoundedCorners(nint handle)
@@ -219,6 +276,16 @@ public static class WindowBackdropHelper
         nint windowHandle,
         nint updateRect,
         nint updateRegion,
+        uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        nint windowHandle,
+        nint insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
         uint flags);
 
     [DllImport("dwmapi.dll")]
