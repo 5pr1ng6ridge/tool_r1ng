@@ -16,22 +16,14 @@ public static class WindowBackdropHelper
     private const uint RdwInvalidate = 0x0001;
     private const uint RdwInternalPaint = 0x0002;
     private const uint RdwAllChildren = 0x0080;
-    private const uint RdwUpdateNow = 0x0100;
     private const uint RdwFrame = 0x0400;
-    private const uint RdwErase = 0x0004;
-    private const uint SwpNoSize = 0x0001;
-    private const uint SwpNoMove = 0x0002;
-    private const uint SwpNoZOrder = 0x0004;
-    private const uint SwpNoActivate = 0x0010;
-    private const uint SwpFrameChanged = 0x0020;
-    private const uint SwpNoOwnerZOrder = 0x0200;
 
-    public static void ApplyAcrylic(Window window, bool isEnabled, double opacity)
+    public static bool ApplyAcrylic(Window window, bool isEnabled, double opacity)
     {
         var handle = new WindowInteropHelper(window).Handle;
         if (handle == nint.Zero)
         {
-            return;
+            return false;
         }
 
         PrepareTransparentClient(handle);
@@ -42,16 +34,18 @@ public static class WindowBackdropHelper
             TryApplyAccentAcrylic(handle, false, opacity);
             TryApplySystemBackdrop(handle, false);
             TryRefreshComposition(handle);
-            return;
+            return true;
         }
 
-        TryApplyAccentAcrylic(handle, false, opacity);
-        if (!TryApplySystemBackdrop(handle, true))
+        TryApplySystemBackdrop(handle, false);
+        if (!TryApplyAccentAcrylic(handle, true, opacity))
         {
-            TryApplyAccentAcrylic(handle, true, opacity);
+            TryApplyAccentAcrylic(handle, false, opacity);
+            TryApplySystemBackdrop(handle, true);
         }
 
         TryRefreshComposition(handle);
+        return true;
     }
 
     public static void RefreshComposition(Window window)
@@ -63,17 +57,6 @@ public static class WindowBackdropHelper
         }
 
         TryRefreshComposition(handle);
-    }
-
-    public static void RefreshBackdropWithoutResize(Window window, bool isEnabled, double opacity)
-    {
-        var handle = new WindowInteropHelper(window).Handle;
-        if (handle == nint.Zero)
-        {
-            return;
-        }
-
-        TryRefreshBackdropWithoutResize(handle, isEnabled, opacity);
     }
 
     private static void PrepareTransparentClient(nint handle)
@@ -100,9 +83,9 @@ public static class WindowBackdropHelper
         }
     }
 
-    private static void TryApplyAccentAcrylic(nint handle, bool isEnabled, double opacity)
+    private static bool TryApplyAccentAcrylic(nint handle, bool isEnabled, double opacity)
     {
-        var tintOpacity = Math.Clamp(opacity * 0.45, 0.08, 0.58);
+        var tintOpacity = Math.Clamp(opacity * 0.20, 0.015, 0.24);
         var alpha = (byte)Math.Clamp(tintOpacity * 255, 0, 255);
         var accent = new AccentPolicy
         {
@@ -125,10 +108,11 @@ public static class WindowBackdropHelper
                 SizeOfData = accentSize
             };
 
-            _ = SetWindowCompositionAttribute(handle, ref data);
+            return SetWindowCompositionAttribute(handle, ref data) != 0;
         }
         catch
         {
+            return false;
         }
         finally
         {
@@ -163,51 +147,11 @@ public static class WindowBackdropHelper
                 handle,
                 nint.Zero,
                 nint.Zero,
-                RdwInvalidate | RdwInternalPaint | RdwErase | RdwAllChildren | RdwUpdateNow | RdwFrame);
-            _ = DwmFlush();
+                RdwInvalidate | RdwInternalPaint | RdwAllChildren | RdwFrame);
         }
         catch
         {
         }
-    }
-
-    private static void TryRefreshBackdropWithoutResize(nint handle, bool isEnabled, double opacity)
-    {
-        try
-        {
-            PrepareTransparentClient(handle);
-            TryApplyAccentAcrylic(handle, false, opacity);
-            TryApplySystemBackdrop(handle, false);
-            TryRefreshFrameWithoutResize(handle);
-            _ = DwmFlush();
-
-            PrepareTransparentClient(handle);
-            if (isEnabled)
-            {
-                TryApplyAccentAcrylic(handle, false, opacity);
-                if (!TryApplySystemBackdrop(handle, true))
-                {
-                    TryApplyAccentAcrylic(handle, true, opacity);
-                }
-            }
-            else
-            {
-                TryApplyAccentAcrylic(handle, false, opacity);
-                TryApplySystemBackdrop(handle, false);
-            }
-
-            TryRefreshFrameWithoutResize(handle);
-            TryRefreshComposition(handle);
-        }
-        catch
-        {
-        }
-    }
-
-    private static void TryRefreshFrameWithoutResize(nint handle)
-    {
-        const uint flags = SwpNoSize | SwpNoMove | SwpNoZOrder | SwpNoActivate | SwpFrameChanged | SwpNoOwnerZOrder;
-        _ = SetWindowPos(handle, nint.Zero, 0, 0, 0, 0, flags);
     }
 
     private static void TryApplyRoundedCorners(nint handle)
@@ -278,16 +222,6 @@ public static class WindowBackdropHelper
         nint updateRegion,
         uint flags);
 
-    [DllImport("user32.dll")]
-    private static extern bool SetWindowPos(
-        nint windowHandle,
-        nint insertAfter,
-        int x,
-        int y,
-        int width,
-        int height,
-        uint flags);
-
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
         nint windowHandle,
@@ -299,7 +233,4 @@ public static class WindowBackdropHelper
     private static extern int DwmExtendFrameIntoClientArea(
         nint windowHandle,
         ref Margins margins);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmFlush();
 }

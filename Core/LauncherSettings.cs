@@ -92,7 +92,7 @@ public sealed class LauncherSettings
 
     private static double NormalizeAcrylicOpacity(double opacity)
     {
-        return Math.Clamp(opacity, 0.15, 0.90);
+        return Math.Clamp(opacity, 0.05, 0.90);
     }
 
     private void Save()

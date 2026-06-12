@@ -31,8 +31,10 @@ public partial class MainWindow : Window
     private readonly GlobalHotKeyService _hotKeyService = new();
     private HwndSource? _windowSource;
     private bool _allowClose;
-    private int _appearanceRefreshVersion;
-    private int _compositionPulseVersion;
+    private bool _isShowingLauncher;
+    private bool? _lastAppliedAcrylicBackdropEnabled;
+    private double _lastAppliedAcrylicOpacity = double.NaN;
+    private int _wakeRefreshVersion;
 
     public MainWindow()
     {
@@ -61,7 +63,7 @@ public partial class MainWindow : Window
         {
             _windowSource = (HwndSource?)PresentationSource.FromVisual(this);
             _windowSource?.AddHook(WindowMessageHook);
-            RefreshAppearance();
+            RefreshAppearance(forceBackdrop: true);
             RegisterHotKey();
         };
         Loaded += async (_, _) =>
@@ -81,12 +83,24 @@ public partial class MainWindow : Window
     {
         CenterLauncher();
         UpdateLauncherHeight();
-        Show();
-        Activate();
+        EnsureNativeHandle();
+        ApplyAppearance(forceBackdrop: true);
+
+        try
+        {
+            _isShowingLauncher = true;
+            Show();
+            Activate();
+        }
+        finally
+        {
+            _isShowingLauncher = false;
+        }
+
         UpdateLayout();
         QueryBox.Focus();
         QueryBox.SelectAll();
-        RefreshAppearanceForWake();
+        RefreshAppearanceForWake(forceBackdrop: true);
         _ = _viewModel.RefreshResultsAsync();
     }
 
@@ -152,13 +166,18 @@ public partial class MainWindow : Window
         {
             case WmShowWindow when wParam != nint.Zero:
             case WmActivate when wParam != nint.Zero:
-                RefreshAppearanceForWake();
+                if (!_isShowingLauncher)
+                {
+                    RefreshAppearanceForWake(forceBackdrop: true);
+                }
                 break;
             case WmWindowPosChanged when IsVisible:
+                RefreshAppearance();
+                break;
             case WmDwmCompositionChanged:
             case WmThemeChanged:
             case WmSettingChange:
-                RefreshAppearance();
+                RefreshAppearance(forceBackdrop: true);
                 break;
         }
 
@@ -249,28 +268,42 @@ public partial class MainWindow : Window
         });
     }
 
-    private void ApplyAppearance()
+    private void EnsureNativeHandle()
     {
-        WindowBackdropHelper.ApplyAcrylic(
-            this,
-            _viewModel.AcrylicBackdropEnabled,
-            _viewModel.AcrylicOpacity);
+        var helper = new WindowInteropHelper(this);
+        if (helper.Handle == nint.Zero)
+        {
+            helper.EnsureHandle();
+        }
+    }
+
+    private void ApplyAppearance(bool forceBackdrop = false)
+    {
+        if (NeedsNativeBackdropUpdate(forceBackdrop)
+            && WindowBackdropHelper.ApplyAcrylic(
+                this,
+                _viewModel.AcrylicBackdropEnabled,
+                _viewModel.AcrylicOpacity))
+        {
+            _lastAppliedAcrylicBackdropEnabled = _viewModel.AcrylicBackdropEnabled;
+            _lastAppliedAcrylicOpacity = _viewModel.AcrylicOpacity;
+        }
 
         var opacity = _viewModel.AcrylicBackdropEnabled
             ? _viewModel.AcrylicOpacity
             : 0.96;
 
         var rootOpacity = _viewModel.AcrylicBackdropEnabled
-            ? Math.Clamp(opacity * 0.56, 0.16, 0.62)
+            ? Math.Clamp(opacity * 0.34, 0.03, 0.42)
             : opacity;
         var headerOpacity = _viewModel.AcrylicBackdropEnabled
-            ? Math.Clamp(opacity * 0.44, 0.14, 0.54)
+            ? Math.Clamp(opacity * 0.28, 0.025, 0.36)
             : 0.92;
         var settingsOpacity = _viewModel.AcrylicBackdropEnabled
-            ? Math.Clamp(opacity * 0.72, 0.22, 0.78)
+            ? Math.Clamp(opacity * 0.42, 0.05, 0.52)
             : 0.96;
         var borderOpacity = _viewModel.AcrylicBackdropEnabled
-            ? Math.Clamp(opacity * 0.62, 0.18, 0.60)
+            ? Math.Clamp(opacity * 0.40, 0.08, 0.44)
             : 0.62;
 
         RootMaterial.Background = CreateWhiteBrush(rootOpacity);
@@ -281,114 +314,64 @@ public partial class MainWindow : Window
         SettingsMaterial.BorderBrush = CreateBrush(borderOpacity * 0.88, 228, 222, 207);
     }
 
-    private void RefreshAppearance()
+    private bool NeedsNativeBackdropUpdate(bool forceBackdrop)
     {
-        ApplyAppearance();
+        return forceBackdrop
+            || _lastAppliedAcrylicBackdropEnabled != _viewModel.AcrylicBackdropEnabled
+            || Math.Abs(_lastAppliedAcrylicOpacity - _viewModel.AcrylicOpacity) >= 0.001;
+    }
+
+    private void RefreshAppearance(bool forceBackdrop = false)
+    {
+        ApplyAppearance(forceBackdrop);
         InvalidateAppearance();
-        ScheduleDeferredAppearanceRefresh();
     }
 
-    private void RefreshAppearanceForWake()
+    private void RefreshAppearanceForWake(bool forceBackdrop = false)
     {
-        RefreshAppearance();
-        ScheduleCompositionPulse();
+        ApplyAppearance(forceBackdrop);
+        InvalidateAppearance();
+        ScheduleWakeCompositionRefresh();
     }
 
-    private void ScheduleDeferredAppearanceRefresh()
+    private void ScheduleWakeCompositionRefresh()
     {
-        var refreshVersion = ++_appearanceRefreshVersion;
+        var refreshVersion = ++_wakeRefreshVersion;
 
         Dispatcher.BeginInvoke(
             (Action)(() =>
             {
-                ApplyDeferredAppearanceRefresh(refreshVersion);
+                ApplyWakeCompositionRefresh(refreshVersion);
             }),
             DispatcherPriority.Render);
 
-        Dispatcher.BeginInvoke(
-            (Action)(() =>
-            {
-                ApplyDeferredAppearanceRefresh(refreshVersion);
-            }),
-            DispatcherPriority.ApplicationIdle);
-
-        _ = ApplyDelayedAppearanceRefreshAsync(refreshVersion);
+        _ = ApplyDelayedWakeCompositionRefreshAsync(refreshVersion);
     }
 
-    private void ScheduleCompositionPulse()
+    private async Task ApplyDelayedWakeCompositionRefreshAsync(int refreshVersion)
     {
-        var pulseVersion = ++_compositionPulseVersion;
+        await Task.Delay(48);
 
-        Dispatcher.BeginInvoke(
-            (Action)(() => ApplyCompositionPulse(pulseVersion)),
-            DispatcherPriority.Render);
-
-        _ = ApplyDelayedCompositionPulseAsync(pulseVersion);
-    }
-
-    private async Task ApplyDelayedCompositionPulseAsync(int pulseVersion)
-    {
-        foreach (var delay in new[] { 24, 84, 168 })
-        {
-            await Task.Delay(delay);
-
-            if (pulseVersion != _compositionPulseVersion)
-            {
-                return;
-            }
-
-            await Dispatcher.InvokeAsync(
-                () => ApplyCompositionPulse(pulseVersion),
-                DispatcherPriority.Render);
-        }
-    }
-
-    private void ApplyCompositionPulse(int pulseVersion)
-    {
-        if (pulseVersion != _compositionPulseVersion || !IsVisible)
+        if (refreshVersion != _wakeRefreshVersion)
         {
             return;
         }
 
-        RefreshCompositionWithoutResize();
+        await Dispatcher.InvokeAsync(
+            () => ApplyWakeCompositionRefresh(refreshVersion),
+            DispatcherPriority.ContextIdle);
     }
 
-    private void RefreshCompositionWithoutResize()
+    private void ApplyWakeCompositionRefresh(int refreshVersion)
     {
-        ApplyAppearance();
-        InvalidateAppearance();
-        WindowBackdropHelper.RefreshBackdropWithoutResize(
-            this,
-            _viewModel.AcrylicBackdropEnabled,
-            _viewModel.AcrylicOpacity);
-    }
-
-    private async Task ApplyDelayedAppearanceRefreshAsync(int refreshVersion)
-    {
-        foreach (var delay in new[] { 32, 96, 180 })
-        {
-            await Task.Delay(delay);
-
-            if (refreshVersion != _appearanceRefreshVersion)
-            {
-                return;
-            }
-
-            await Dispatcher.InvokeAsync(
-                () => ApplyDeferredAppearanceRefresh(refreshVersion),
-                DispatcherPriority.Render);
-        }
-    }
-
-    private void ApplyDeferredAppearanceRefresh(int refreshVersion)
-    {
-        if (refreshVersion != _appearanceRefreshVersion || !IsVisible)
+        if (refreshVersion != _wakeRefreshVersion || !IsVisible)
         {
             return;
         }
 
         ApplyAppearance();
         InvalidateAppearance();
+        WindowBackdropHelper.RefreshComposition(this);
     }
 
     private void InvalidateAppearance()
@@ -397,7 +380,6 @@ public partial class MainWindow : Window
         HeaderMaterial.InvalidateVisual();
         SettingsMaterial.InvalidateVisual();
         InvalidateVisual();
-        WindowBackdropHelper.RefreshComposition(this);
     }
 
     private static byte ToAlpha(double opacity)

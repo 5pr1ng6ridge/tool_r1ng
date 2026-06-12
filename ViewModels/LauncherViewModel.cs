@@ -395,7 +395,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
     public void SetAcrylicOpacity(double opacity)
     {
-        var normalizedOpacity = Math.Clamp(opacity, 0.15, 0.90);
+        var normalizedOpacity = Math.Clamp(opacity, 0.05, 0.90);
         _settings.SetAcrylicOpacity(normalizedOpacity);
         AcrylicOpacity = normalizedOpacity;
         AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
