@@ -11,7 +11,7 @@ public sealed class WebSearchProvider : tool_r1ng.Core.IQueryProvider
 
     public ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
-        if (context.IsEmpty)
+        if (context.IsEmpty || context.IsForcedFileSearch)
         {
             return ValueTask.FromResult<IReadOnlyList<QueryResult>>(Array.Empty<QueryResult>());
         }

@@ -9,9 +9,11 @@ namespace tool_r1ng.Providers;
 
 public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmUpProvider
 {
+    private static readonly TimeSpan CacheLifetime = TimeSpan.FromSeconds(4);
     private readonly LauncherSettings _settings;
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private IReadOnlyList<ApplicationEntry>? _cachedApps;
+    private DateTime _cachedAppsLoadedAtUtc = DateTime.MinValue;
     private int _cachedSettingsVersion = -1;
 
     public ApplicationsProvider(LauncherSettings settings)
@@ -81,20 +83,21 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmU
 
     private async Task<IReadOnlyList<ApplicationEntry>> EnsureCacheAsync(CancellationToken cancellationToken)
     {
-        if (_cachedApps is not null && _cachedSettingsVersion == _settings.Version)
+        if (IsCacheCurrent())
         {
-            return _cachedApps;
+            return _cachedApps!;
         }
 
         await _cacheLock.WaitAsync(cancellationToken);
         try
         {
-            if (_cachedApps is not null && _cachedSettingsVersion == _settings.Version)
+            if (IsCacheCurrent())
             {
-                return _cachedApps;
+                return _cachedApps!;
             }
 
             _cachedApps = await Task.Run(LoadApplications, cancellationToken);
+            _cachedAppsLoadedAtUtc = DateTime.UtcNow;
             _cachedSettingsVersion = _settings.Version;
             return _cachedApps;
         }
@@ -102,6 +105,13 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmU
         {
             _cacheLock.Release();
         }
+    }
+
+    private bool IsCacheCurrent()
+    {
+        return _cachedApps is not null
+            && _cachedSettingsVersion == _settings.Version
+            && DateTime.UtcNow - _cachedAppsLoadedAtUtc < CacheLifetime;
     }
 
     private IReadOnlyList<ApplicationEntry> LoadApplications()

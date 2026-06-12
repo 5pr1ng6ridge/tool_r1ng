@@ -56,6 +56,43 @@ public static class ProcessLauncher
         return Task.CompletedTask;
     }
 
+    public static Task OpenEverythingSearchAsync(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Task.CompletedTask;
+        }
+
+        var everythingPath = FindEverythingExecutable();
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = everythingPath ?? "Everything.exe",
+            Arguments = $"-s \"{EscapeArgument(query)}\"",
+            UseShellExecute = true
+        };
+
+        Process.Start(startInfo);
+        return Task.CompletedTask;
+    }
+
+    private static string? FindEverythingExecutable()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Everything", "Everything.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Everything", "Everything.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Everything", "Everything.exe"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Everything", "Everything.exe")
+        };
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string EscapeArgument(string value)
+    {
+        return value.Replace("\"", "\\\"", StringComparison.Ordinal);
+    }
+
     private static string ResolveFolderTarget(string target)
     {
         if (!Path.GetExtension(target).Equals(".lnk", StringComparison.OrdinalIgnoreCase))

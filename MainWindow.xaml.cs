@@ -87,6 +87,7 @@ public partial class MainWindow : Window
         QueryBox.Focus();
         QueryBox.SelectAll();
         RefreshAppearanceForWake();
+        _ = _viewModel.RefreshResultsAsync();
     }
 
     public void PrepareForShutdown()

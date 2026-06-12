@@ -59,10 +59,21 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
                 .Select(result => CreateResult(result, query, isForced))
                 .ToList();
 
+            if (isForced)
+            {
+                results.Add(CreateOpenEverythingResult(query, EndsWithExplicitSpace(context.RawQuery)));
+            }
+
             return ValueTask.FromResult<IReadOnlyList<QueryResult>>(results);
         }
         catch
         {
+            if (isForced)
+            {
+                return ValueTask.FromResult<IReadOnlyList<QueryResult>>(
+                    [CreateOpenEverythingResult(query, EndsWithExplicitSpace(context.RawQuery))]);
+            }
+
             return ValueTask.FromResult<IReadOnlyList<QueryResult>>(Array.Empty<QueryResult>());
         }
     }
@@ -92,5 +103,25 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
             SecondaryActionToolTip = "Open containing folder",
             SecondaryActionAsync = _ => ProcessLauncher.OpenContainingFolderAsync(result.FullPath)
         };
+    }
+
+    private static QueryResult CreateOpenEverythingResult(string query, bool isPreferred)
+    {
+        return new QueryResult
+        {
+            Title = query,
+            HighlightedTitle = HighlightBuilder.Build(query, Enumerable.Range(0, query.Length).ToArray()),
+            Subtitle = "Open search in Everything",
+            IconGlyph = "\uE721",
+            ProviderId = "everything-search",
+            ProviderName = "Everything",
+            Score = isPreferred ? 320 : 220,
+            ExecuteAsync = _ => ProcessLauncher.OpenEverythingSearchAsync(query)
+        };
+    }
+
+    private static bool EndsWithExplicitSpace(string query)
+    {
+        return query.Length > 0 && char.IsWhiteSpace(query[^1]);
     }
 }
