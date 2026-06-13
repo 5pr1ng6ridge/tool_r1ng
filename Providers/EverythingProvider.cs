@@ -40,6 +40,11 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
 
     public ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
+        if (context.IsProviderExclusiveQuery)
+        {
+            return ValueTask.FromResult<IReadOnlyList<QueryResult>>(Array.Empty<QueryResult>());
+        }
+
         var isForced = context.IsForcedFileSearch;
         if (!_settings.EnableEverythingFileSearch && !isForced)
         {
@@ -101,7 +106,14 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
             ExecuteAsync = _ => ProcessLauncher.OpenAsync(result.FullPath),
             SecondaryActionGlyph = "\uE8B7",
             SecondaryActionToolTip = "Open containing folder",
-            SecondaryActionAsync = _ => ProcessLauncher.OpenContainingFolderAsync(result.FullPath)
+            SecondaryActionAsync = _ => ProcessLauncher.OpenContainingFolderAsync(result.FullPath),
+            LaunchHistoryEntry = new LaunchHistoryEntry(
+                title,
+                result.FullPath,
+                result.FullPath,
+                result.FullPath,
+                result.IsFolder ? "Everything folder" : "Everything file",
+                LaunchHistoryKinds.Path)
         };
     }
 
@@ -116,7 +128,14 @@ public sealed class EverythingProvider : tool_r1ng.Core.IQueryProvider, IWarmUpP
             ProviderId = "everything-search",
             ProviderName = "Everything",
             Score = isPreferred ? 320 : 220,
-            ExecuteAsync = _ => ProcessLauncher.OpenEverythingSearchAsync(query)
+            ExecuteAsync = _ => ProcessLauncher.OpenEverythingSearchAsync(query),
+            LaunchHistoryEntry = new LaunchHistoryEntry(
+                query,
+                query,
+                string.Empty,
+                string.Empty,
+                "Everything search",
+                LaunchHistoryKinds.EverythingSearch)
         };
     }
 

@@ -8,13 +8,11 @@
     <PlatformTarget>x64</PlatformTarget>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Everything-SDK\**\*.cs" />
-    <EmbeddedResource Remove="Everything-SDK\**\*" />
-    <None Remove="Everything-SDK\**\*" />
-    <Page Remove="Everything-SDK\**\*.xaml" />
+    <Content Include="app.ico" />
   </ItemGroup>
 
 </Project>

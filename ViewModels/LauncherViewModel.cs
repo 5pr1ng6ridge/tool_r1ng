@@ -325,19 +325,29 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
     public async Task RefreshResultsAsync()
     {
+        await RefreshResultsAsync(QueryText);
+    }
+
+    public async Task RefreshResultsForPreviewTextAsync(string queryText)
+    {
+        await RefreshResultsAsync(queryText);
+    }
+
+    private async Task RefreshResultsAsync(string queryText)
+    {
         _searchCancellation?.Cancel();
         _searchCancellation = new CancellationTokenSource();
         var cancellationToken = _searchCancellation.Token;
 
         try
         {
-            if (string.IsNullOrWhiteSpace(QueryText))
+            if (string.IsNullOrWhiteSpace(queryText))
             {
                 ReplaceResults([], cancellationToken);
                 return;
             }
 
-            if (IsSettingsVisible)
+            if (queryText.TrimStart().StartsWith("/", StringComparison.Ordinal))
             {
                 ReplaceResults([], cancellationToken);
                 return;
@@ -345,7 +355,7 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
             IsSearching = true;
             await Task.Delay(80, cancellationToken);
-            var query = QueryText;
+            var query = queryText;
             var results = await Task.Run(
                 () => _engine.SearchAsync(query, cancellationToken),
                 cancellationToken);
@@ -508,6 +518,11 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         try
         {
             await result.ExecuteAsync(CancellationToken.None);
+            if (result.LaunchHistoryEntry is not null)
+            {
+                LaunchHistoryStore.Record(result.LaunchHistoryEntry);
+            }
+
             if (result.DismissAfterExecute)
             {
                 RequestHide?.Invoke(this, EventArgs.Empty);

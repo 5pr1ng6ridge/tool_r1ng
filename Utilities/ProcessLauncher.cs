@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace tool_r1ng.Utilities;
 
@@ -72,6 +73,28 @@ public static class ProcessLauncher
         };
 
         Process.Start(startInfo);
+        return Task.CompletedTask;
+    }
+
+    public static Task RunCommandAsync(string command, bool closeAfterExecute)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return Task.CompletedTask;
+        }
+
+        var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+        var arguments = closeAfterExecute
+            ? $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}"
+            : $"-NoExit -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}";
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            Arguments = arguments,
+            UseShellExecute = true
+        });
+
         return Task.CompletedTask;
     }
 

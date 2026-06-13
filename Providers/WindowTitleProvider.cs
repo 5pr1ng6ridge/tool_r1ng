@@ -34,28 +34,32 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
 
     public ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
-        if (context.IsEmpty)
+        if (context.IsProviderExclusiveQuery && !context.IsWindowPriorityQuery
+            || context.IsEmpty && !context.IsWindowPriorityQuery)
         {
             return ValueTask.FromResult<IReadOnlyList<QueryResult>>(Array.Empty<QueryResult>());
         }
 
+        var isListingWindows = context.IsWindowPriorityQuery && string.IsNullOrWhiteSpace(context.Query);
         var results = EnumerateWindows()
             .Select(window => new
             {
                 Window = window,
-                Match = FuzzyMatcher.Match(window.Title, context.Query)
+                Match = isListingWindows
+                    ? new FuzzyMatchResult(80, [])
+                    : FuzzyMatcher.Match(window.Title, context.Query)
             })
-            .Where(item => item.Match.Score >= MinScore)
+            .Where(item => isListingWindows || item.Match.Score >= MinScore)
             .OrderByDescending(item => item.Match.Score)
             .ThenBy(item => item.Window.Title)
             .Take(MaxResults)
-            .Select(item => CreateResult(item.Window, item.Match))
+            .Select(item => CreateResult(item.Window, item.Match, context.IsWindowPriorityQuery))
             .ToList();
 
         return ValueTask.FromResult<IReadOnlyList<QueryResult>>(results);
     }
 
-    private QueryResult CreateResult(WindowEntry window, FuzzyMatchResult match)
+    private QueryResult CreateResult(WindowEntry window, FuzzyMatchResult match, bool isPrioritized)
     {
         var isLocked = IsWindowLocked(window.Handle);
         var subtitle = string.IsNullOrWhiteSpace(window.ProcessName)
@@ -70,7 +74,7 @@ public sealed class WindowTitleProvider : tool_r1ng.Core.IQueryProvider
             IconGlyph = "\uE7C4",
             ProviderId = Id,
             ProviderName = Name,
-            Score = match.Score + 6,
+            Score = match.Score + (isPrioritized ? 220 : 6),
             ExecuteAsync = _ => ActivateWindowAsync(window.Handle),
             InlineActionGlyph = isLocked ? "\uE785" : "\uE72E",
             InlineActionToolTip = isLocked ? "Unlock window movement" : "Lock window movement",

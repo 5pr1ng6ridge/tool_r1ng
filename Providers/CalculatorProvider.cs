@@ -13,6 +13,11 @@ public sealed class CalculatorProvider : tool_r1ng.Core.IQueryProvider
 
     public ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
+        if (context.IsProviderExclusiveQuery)
+        {
+            return ValueTask.FromResult<IReadOnlyList<QueryResult>>(Array.Empty<QueryResult>());
+        }
+
         var expression = context.Query.StartsWith("=", StringComparison.Ordinal)
             ? context.Query[1..].Trim()
             : context.Query;

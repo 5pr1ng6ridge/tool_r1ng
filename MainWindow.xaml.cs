@@ -44,6 +44,10 @@ public partial class MainWindow : Window
         var settings = LauncherSettings.Load();
         var engine = new LauncherEngine([
             new CalculatorProvider(),
+            new CommandProvider(),
+            new ApplicationHistoryProvider(),
+            new PathProvider(),
+            new WindowsSettingsProvider(),
             new ApplicationsProvider(settings),
             new EverythingProvider(settings),
             new WindowTitleProvider(),
@@ -259,11 +263,13 @@ public partial class MainWindow : Window
     private void QueryBox_TextInputStart(object sender, TextCompositionEventArgs e)
     {
         _viewModel.SetCompletionSuppressed(true);
+        RefreshResultsForComposition(e);
     }
 
     private void QueryBox_TextInputUpdate(object sender, TextCompositionEventArgs e)
     {
         _viewModel.SetCompletionSuppressed(true);
+        RefreshResultsForComposition(e);
     }
 
     private void QueryBox_TextInputCommitted(object sender, TextCompositionEventArgs e)
@@ -272,6 +278,31 @@ public partial class MainWindow : Window
         {
             _viewModel.SetCompletionSuppressed(false);
         });
+    }
+
+    private void RefreshResultsForComposition(TextCompositionEventArgs e)
+    {
+        var compositionText = e.TextComposition.CompositionText;
+        if (string.IsNullOrEmpty(compositionText))
+        {
+            compositionText = e.TextComposition.Text;
+        }
+
+        if (string.IsNullOrEmpty(compositionText))
+        {
+            return;
+        }
+
+        _ = _viewModel.RefreshResultsForPreviewTextAsync(BuildPreviewQueryText(compositionText));
+    }
+
+    private string BuildPreviewQueryText(string compositionText)
+    {
+        var text = QueryBox.Text ?? string.Empty;
+        var selectionStart = Math.Clamp(QueryBox.SelectionStart, 0, text.Length);
+        var selectionLength = Math.Clamp(QueryBox.SelectionLength, 0, text.Length - selectionStart);
+
+        return text.Remove(selectionStart, selectionLength).Insert(selectionStart, compositionText);
     }
 
     private void EnsureNativeHandle()

@@ -9,6 +9,7 @@
         Title="tool_r1ng"
         Width="760"
         Height="64"
+        Icon="app.ico"
         MinWidth="520"
         MinHeight="64"
         MaxHeight="500"

@@ -10,7 +10,7 @@
 *.sln.docstates
 
 Everything-SDK
-
+app.ico
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

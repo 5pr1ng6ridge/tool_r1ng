@@ -45,4 +45,6 @@ public sealed class QueryResult
     public string SecondaryActionToolTip { get; init; } = string.Empty;
 
     public bool HasSecondaryAction => SecondaryActionAsync is not null;
+
+    public LaunchHistoryEntry? LaunchHistoryEntry { get; init; }
 }

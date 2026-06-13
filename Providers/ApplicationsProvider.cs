@@ -32,6 +32,11 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmU
 
     public async ValueTask<IReadOnlyList<QueryResult>> QueryAsync(QueryContext context, CancellationToken cancellationToken)
     {
+        if (context.IsProviderExclusiveQuery)
+        {
+            return Array.Empty<QueryResult>();
+        }
+
         var apps = await EnsureCacheAsync(cancellationToken);
 
         if (context.IsEmpty)
@@ -77,7 +82,13 @@ public sealed class ApplicationsProvider : tool_r1ng.Core.IQueryProvider, IWarmU
             SecondaryActionToolTip = "Open containing folder",
             SecondaryActionAsync = string.IsNullOrWhiteSpace(app.FolderPath)
                 ? null
-                : _ => ProcessLauncher.OpenContainingFolderAsync(app.FolderPath)
+                : _ => ProcessLauncher.OpenContainingFolderAsync(app.FolderPath),
+            LaunchHistoryEntry = new LaunchHistoryEntry(
+                app.Name,
+                app.LaunchPath,
+                app.IconPath,
+                app.FolderPath,
+                app.Location)
         };
     }
 
