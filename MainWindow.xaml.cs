@@ -25,7 +25,7 @@ public partial class MainWindow : Window
     private const double FooterHeight = 12;
     private const double ResultsListVerticalSpacing = 14;
     private const double ResultRowHeight = 64;
-    private const double SettingsPanelHeight = 278;
+    private const double SettingsPanelHeight = 436;
 
     private readonly LauncherViewModel _viewModel;
     private readonly GlobalHotKeyService _hotKeyService = new();
@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private bool _isShowingLauncher;
     private bool? _lastAppliedAcrylicBackdropEnabled;
     private double _lastAppliedAcrylicOpacity = double.NaN;
+    private System.Windows.Media.Color? _lastAppliedAcrylicTintColor;
     private int _wakeRefreshVersion;
 
     public MainWindow()
@@ -213,6 +214,11 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
+        if (IsSettingsTextInput(e.OriginalSource))
+        {
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Escape:
@@ -277,16 +283,59 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool IsSettingsTextInput(object source)
+    {
+        if (source is not DependencyObject dependencyObject)
+        {
+            return false;
+        }
+
+        var textBox = FindVisualParent<System.Windows.Controls.TextBox>(dependencyObject);
+        return textBox is not null && !ReferenceEquals(textBox, QueryBox);
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject dependencyObject)
+        where T : DependencyObject
+    {
+        var current = dependencyObject;
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = GetParent(current);
+        }
+
+        return null;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject dependencyObject)
+    {
+        try
+        {
+            return VisualTreeHelper.GetParent(dependencyObject)
+                ?? LogicalTreeHelper.GetParent(dependencyObject);
+        }
+        catch (InvalidOperationException)
+        {
+            return LogicalTreeHelper.GetParent(dependencyObject);
+        }
+    }
+
     private void ApplyAppearance(bool forceBackdrop = false)
     {
         if (NeedsNativeBackdropUpdate(forceBackdrop)
             && WindowBackdropHelper.ApplyAcrylic(
                 this,
                 _viewModel.AcrylicBackdropEnabled,
-                _viewModel.AcrylicOpacity))
+                _viewModel.AcrylicOpacity,
+                _viewModel.WindowMaterialColorValue))
         {
             _lastAppliedAcrylicBackdropEnabled = _viewModel.AcrylicBackdropEnabled;
             _lastAppliedAcrylicOpacity = _viewModel.AcrylicOpacity;
+            _lastAppliedAcrylicTintColor = _viewModel.WindowMaterialColorValue;
         }
 
         var opacity = _viewModel.AcrylicBackdropEnabled
@@ -294,7 +343,7 @@ public partial class MainWindow : Window
             : 0.96;
 
         var rootOpacity = _viewModel.AcrylicBackdropEnabled
-            ? Math.Clamp(opacity * 0.34, 0.03, 0.42)
+            ? Math.Clamp(opacity * 0.04, 0.005, 0.42)
             : opacity;
         var headerOpacity = _viewModel.AcrylicBackdropEnabled
             ? Math.Clamp(opacity * 0.28, 0.025, 0.36)
@@ -306,19 +355,20 @@ public partial class MainWindow : Window
             ? Math.Clamp(opacity * 0.40, 0.08, 0.44)
             : 0.62;
 
-        RootMaterial.Background = CreateWhiteBrush(rootOpacity);
-        HeaderMaterial.Background = CreateWhiteBrush(headerOpacity);
-        SettingsMaterial.Background = CreateWhiteBrush(settingsOpacity);
-        RootMaterial.BorderBrush = CreateBrush(borderOpacity, 214, 208, 195);
-        HeaderMaterial.BorderBrush = CreateBrush(borderOpacity * 0.82, 228, 222, 207);
-        SettingsMaterial.BorderBrush = CreateBrush(borderOpacity * 0.88, 228, 222, 207);
+        RootMaterial.Background = CreateBrush(rootOpacity, _viewModel.WindowMaterialColorValue);
+        HeaderMaterial.Background = CreateBrush(headerOpacity, _viewModel.HeaderMaterialColorValue);
+        SettingsMaterial.Background = CreateBrush(settingsOpacity, _viewModel.SettingsMaterialColorValue);
+        RootMaterial.BorderBrush = CreateBrush(borderOpacity, _viewModel.BorderMaterialColorValue);
+        HeaderMaterial.BorderBrush = CreateBrush(borderOpacity * 0.82, _viewModel.BorderMaterialColorValue);
+        SettingsMaterial.BorderBrush = CreateBrush(borderOpacity * 0.88, _viewModel.BorderMaterialColorValue);
     }
 
     private bool NeedsNativeBackdropUpdate(bool forceBackdrop)
     {
         return forceBackdrop
             || _lastAppliedAcrylicBackdropEnabled != _viewModel.AcrylicBackdropEnabled
-            || Math.Abs(_lastAppliedAcrylicOpacity - _viewModel.AcrylicOpacity) >= 0.001;
+            || Math.Abs(_lastAppliedAcrylicOpacity - _viewModel.AcrylicOpacity) >= 0.001
+            || _lastAppliedAcrylicTintColor != _viewModel.WindowMaterialColorValue;
     }
 
     private void RefreshAppearance(bool forceBackdrop = false)
@@ -387,9 +437,9 @@ public partial class MainWindow : Window
         return (byte)Math.Clamp(opacity * 255, 0, 255);
     }
 
-    private static SolidColorBrush CreateWhiteBrush(double opacity)
+    private static SolidColorBrush CreateBrush(double opacity, System.Windows.Media.Color color)
     {
-        return CreateBrush(opacity, 255, 255, 255);
+        return CreateBrush(opacity, color.R, color.G, color.B);
     }
 
     private static SolidColorBrush CreateBrush(double opacity, byte red, byte green, byte blue)
@@ -437,6 +487,33 @@ public partial class MainWindow : Window
         }
 
         viewModel.SetAcrylicOpacity(e.NewValue);
+    }
+
+    private void ColorTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox textBox)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Enter:
+                textBox.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty)?.UpdateSource();
+                Keyboard.ClearFocus();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                textBox.GetBindingExpression(System.Windows.Controls.TextBox.TextProperty)?.UpdateTarget();
+                Keyboard.ClearFocus();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void ResetMaterialColors_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ResetMaterialColors();
     }
 
     private async void InlineActionButton_Click(object sender, RoutedEventArgs e)

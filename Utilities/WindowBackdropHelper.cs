@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using MediaColor = System.Windows.Media.Color;
 
 namespace tool_r1ng.Utilities;
 
@@ -18,7 +19,7 @@ public static class WindowBackdropHelper
     private const uint RdwAllChildren = 0x0080;
     private const uint RdwFrame = 0x0400;
 
-    public static bool ApplyAcrylic(Window window, bool isEnabled, double opacity)
+    public static bool ApplyAcrylic(Window window, bool isEnabled, double opacity, MediaColor tintColor)
     {
         var handle = new WindowInteropHelper(window).Handle;
         if (handle == nint.Zero)
@@ -31,16 +32,16 @@ public static class WindowBackdropHelper
 
         if (!isEnabled)
         {
-            TryApplyAccentAcrylic(handle, false, opacity);
+            TryApplyAccentAcrylic(handle, false, opacity, tintColor);
             TryApplySystemBackdrop(handle, false);
             TryRefreshComposition(handle);
             return true;
         }
 
         TryApplySystemBackdrop(handle, false);
-        if (!TryApplyAccentAcrylic(handle, true, opacity))
+        if (!TryApplyAccentAcrylic(handle, true, opacity, tintColor))
         {
-            TryApplyAccentAcrylic(handle, false, opacity);
+            TryApplyAccentAcrylic(handle, false, opacity, tintColor);
             TryApplySystemBackdrop(handle, true);
         }
 
@@ -83,7 +84,7 @@ public static class WindowBackdropHelper
         }
     }
 
-    private static bool TryApplyAccentAcrylic(nint handle, bool isEnabled, double opacity)
+    private static bool TryApplyAccentAcrylic(nint handle, bool isEnabled, double opacity, MediaColor tintColor)
     {
         var tintOpacity = Math.Clamp(opacity * 0.20, 0.015, 0.24);
         var alpha = (byte)Math.Clamp(tintOpacity * 255, 0, 255);
@@ -93,7 +94,7 @@ public static class WindowBackdropHelper
                 ? AccentState.AccentEnableAcrylicBlurBehind
                 : AccentState.AccentDisabled,
             AccentFlags = 2,
-            GradientColor = ToAbgr(alpha, 0xF7, 0xFB, 0xFC)
+            GradientColor = ToAbgr(alpha, tintColor.R, tintColor.G, tintColor.B)
         };
 
         var accentSize = Marshal.SizeOf<AccentPolicy>();

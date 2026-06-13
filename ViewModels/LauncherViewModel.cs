@@ -6,6 +6,11 @@ using System.Windows.Input;
 using tool_r1ng.Core;
 using tool_r1ng.Services;
 using tool_r1ng.Utilities;
+using MediaBrush = System.Windows.Media.Brush;
+using MediaColor = System.Windows.Media.Color;
+using MediaColors = System.Windows.Media.Colors;
+using MediaColorConverter = System.Windows.Media.ColorConverter;
+using SolidColorBrush = System.Windows.Media.SolidColorBrush;
 
 namespace tool_r1ng.ViewModels;
 
@@ -28,6 +33,10 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private bool _isRefreshingEverythingStatus;
     private bool _acrylicBackdropEnabled;
     private double _acrylicOpacity;
+    private string _windowMaterialColor;
+    private string _headerMaterialColor;
+    private string _settingsMaterialColor;
+    private string _borderMaterialColor;
 
     public LauncherViewModel(LauncherEngine engine, LauncherSettings settings)
     {
@@ -37,6 +46,10 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         _everythingAppSearchEnabled = settings.EnableEverythingAppSearch;
         _acrylicBackdropEnabled = settings.EnableAcrylicBackdrop;
         _acrylicOpacity = settings.AcrylicOpacity;
+        _windowMaterialColor = settings.WindowMaterialColor;
+        _headerMaterialColor = settings.HeaderMaterialColor;
+        _settingsMaterialColor = settings.SettingsMaterialColor;
+        _borderMaterialColor = settings.BorderMaterialColor;
         EverythingStatusText = "Everything 状态未检测";
         _executeSelectedCommand = new AsyncRelayCommand(_ => ExecuteSelectedAsync(), _ => SelectedResult is not null);
         HideCommand = new AsyncRelayCommand(_ =>
@@ -242,6 +255,74 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
 
     public string AcrylicOpacityPercent => $"{Math.Round(AcrylicOpacity * 100):0}%";
 
+    public string WindowMaterialColor
+    {
+        get => _windowMaterialColor;
+        set => SetMaterialColor(
+            ref _windowMaterialColor,
+            value,
+            _settings.SetWindowMaterialColor,
+            nameof(WindowMaterialColor),
+            nameof(WindowMaterialColorBrush));
+    }
+
+    public string HeaderMaterialColor
+    {
+        get => _headerMaterialColor;
+        set => SetMaterialColor(
+            ref _headerMaterialColor,
+            value,
+            _settings.SetHeaderMaterialColor,
+            nameof(HeaderMaterialColor),
+            nameof(HeaderMaterialColorBrush));
+    }
+
+    public string SettingsMaterialColor
+    {
+        get => _settingsMaterialColor;
+        set => SetMaterialColor(
+            ref _settingsMaterialColor,
+            value,
+            _settings.SetSettingsMaterialColor,
+            nameof(SettingsMaterialColor),
+            nameof(SettingsMaterialColorBrush));
+    }
+
+    public string BorderMaterialColor
+    {
+        get => _borderMaterialColor;
+        set => SetMaterialColor(
+            ref _borderMaterialColor,
+            value,
+            _settings.SetBorderMaterialColor,
+            nameof(BorderMaterialColor),
+            nameof(BorderMaterialColorBrush));
+    }
+
+    public MediaColor WindowMaterialColorValue => ParseColor(
+        WindowMaterialColor,
+        LauncherSettings.DefaultWindowMaterialColor);
+
+    public MediaColor HeaderMaterialColorValue => ParseColor(
+        HeaderMaterialColor,
+        LauncherSettings.DefaultHeaderMaterialColor);
+
+    public MediaColor SettingsMaterialColorValue => ParseColor(
+        SettingsMaterialColor,
+        LauncherSettings.DefaultSettingsMaterialColor);
+
+    public MediaColor BorderMaterialColorValue => ParseColor(
+        BorderMaterialColor,
+        LauncherSettings.DefaultBorderMaterialColor);
+
+    public MediaBrush WindowMaterialColorBrush => CreateMaterialBrush(WindowMaterialColorValue);
+
+    public MediaBrush HeaderMaterialColorBrush => CreateMaterialBrush(HeaderMaterialColorValue);
+
+    public MediaBrush SettingsMaterialColorBrush => CreateMaterialBrush(SettingsMaterialColorValue);
+
+    public MediaBrush BorderMaterialColorBrush => CreateMaterialBrush(BorderMaterialColorValue);
+
     public async Task RefreshResultsAsync()
     {
         _searchCancellation?.Cancel();
@@ -401,6 +482,21 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
         AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void ResetMaterialColors()
+    {
+        _settings.ResetMaterialColors();
+        _windowMaterialColor = _settings.WindowMaterialColor;
+        _headerMaterialColor = _settings.HeaderMaterialColor;
+        _settingsMaterialColor = _settings.SettingsMaterialColor;
+        _borderMaterialColor = _settings.BorderMaterialColor;
+
+        NotifyMaterialColorChanged(nameof(WindowMaterialColor), nameof(WindowMaterialColorBrush));
+        NotifyMaterialColorChanged(nameof(HeaderMaterialColor), nameof(HeaderMaterialColorBrush));
+        NotifyMaterialColorChanged(nameof(SettingsMaterialColor), nameof(SettingsMaterialColorBrush));
+        NotifyMaterialColorChanged(nameof(BorderMaterialColor), nameof(BorderMaterialColorBrush));
+        AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     private async Task ExecuteSelectedAsync()
     {
         var result = SelectedResult;
@@ -431,6 +527,54 @@ public sealed class LauncherViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    private void SetMaterialColor(
+        ref string field,
+        string value,
+        Action<string> save,
+        string propertyName,
+        string brushPropertyName)
+    {
+        if (!LauncherSettings.TryNormalizeHexColor(value, out var normalizedColor))
+        {
+            StatusText = "Color must use #RRGGBB";
+            OnPropertyChanged(propertyName);
+            return;
+        }
+
+        if (field == normalizedColor)
+        {
+            OnPropertyChanged(propertyName);
+            return;
+        }
+
+        field = normalizedColor;
+        save(normalizedColor);
+        NotifyMaterialColorChanged(propertyName, brushPropertyName);
+        AppearanceSettingsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void NotifyMaterialColorChanged(string propertyName, string brushPropertyName)
+    {
+        OnPropertyChanged(propertyName);
+        OnPropertyChanged(brushPropertyName);
+        StatusText = "Theme colors updated";
+    }
+
+    private static MediaColor ParseColor(string color, string fallback)
+    {
+        var normalizedColor = LauncherSettings.NormalizeHexColor(color, fallback);
+        return MediaColorConverter.ConvertFromString(normalizedColor) is MediaColor parsedColor
+            ? parsedColor
+            : MediaColors.White;
+    }
+
+    private static MediaBrush CreateMaterialBrush(MediaColor color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
     }
 
     private async Task<bool> TryApplyEverythingSettingAsync(bool isEnabled)
